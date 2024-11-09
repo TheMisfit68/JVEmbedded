@@ -6,9 +6,9 @@ import PackageDescription
 let package = Package(
     name: "JVEmbedded",
 	products: [
-		.library(name: "JVEmbedded", targets: ["JVEmbedded"]),
+		.library(name: "JVEmbedded", targets: ["dummyTarget"]),
 	],
 	targets: [
-		.target(name: "JVEmbedded")
+		.target(name: "dummyTarget")
 	]
 )

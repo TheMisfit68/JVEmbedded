@@ -4,5 +4,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "JVEmbedded"
+    name: "JVEmbedded",
+	products: [
+		.library(name: "JVEmbedded", targets: ["JVEmbedded"]),
+	],
+	targets: [
+		.target(name: "JVEmbedded")
+	]
 )

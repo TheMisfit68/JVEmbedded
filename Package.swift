@@ -4,11 +4,19 @@
 import PackageDescription
 
 let package = Package(
-    name: "JVEmbedded",
+	name: "JVEmbedded",
+	platforms: [
+		.macOS("10.15"),
+	],
 	products: [
-		.library(name: "JVEmbedded", targets: ["dummyTarget"]),
+		.library(name: "dummyTarget", targets: ["dummyTarget"]),
+	],
+	dependencies: [
+		.package(path: "~/Documents/Development/Projects/Personal/Embedded Controllers/MatTerMasterPlugin"),
 	],
 	targets: [
-		.target(name: "dummyTarget")
+		.target(
+			name: "dummyTarget"
+		)
 	]
 )

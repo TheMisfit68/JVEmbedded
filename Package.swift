@@ -12,7 +12,6 @@ let package = Package(
 		.library(name: "dummyTarget", targets: ["dummyTarget"]),
 	],
 	dependencies: [
-		.package(path: "~/Documents/Development/Projects/Personal/Embedded Controllers/MatTerMaster"),
 	],
 	targets: [
 		.target(

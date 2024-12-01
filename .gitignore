@@ -1,2 +1,13 @@
-*.xcuserstate
+# Ignore build directories and artifacts
+Sources/*/Exclude/managed_components/
+Sources/*/Exclude/build
+
+# Ignore files
+bookmarks.plist
+
+# Ignore extensions
 .DS_Store
+.swiftpm
+.vscode
+.xcuserstate
+.swiftpm

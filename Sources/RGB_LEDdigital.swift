@@ -1,17 +1,17 @@
 // DiscreteRGBblinker.swift
-// JVIDF
+// JVembedded
 //
 // Created by Jan Verrept on 05/11/2024.
 //
 
 class RGB_LEDdigital {
 	
-	enum RGBColor: CaseIterable {
-		case red
-		case green
-		case blue
-		case off
-		
+	enum RGBColor: String, CaseIterable {
+		case red = "🔴"
+		case green = "🟢"
+		case blue = "🔵"
+		case off = "⚫️"
+
 		// Method to get the next color in the sequence
 		func next() -> RGBColor {
 			
@@ -35,36 +35,13 @@ class RGB_LEDdigital {
 	
 	public var color: RGBColor = .off {
 		didSet {
-			switch color {
-				case .red:
+					discreteRedLed.logicalValue = (color == .red)
+					discreteGreenLed.logicalValue = (color == .green)
+					discreteBlueLed.logicalValue = (color == .blue)
 #if DEBUG
-					print("Switching color to 🔴")
+					let colorRepresentation:String = color.rawValue
+					print("Switching color to \(colorRepresentation)")
 #endif
-					discreteRedLed.logicalValue = true
-					discreteGreenLed.logicalValue = false
-					discreteBlueLed.logicalValue = false
-				case .green:
-#if DEBUG
-					print("Switching color to 🟢")
-#endif
-					discreteRedLed.logicalValue = false
-					discreteGreenLed.logicalValue = true
-					discreteBlueLed.logicalValue = false
-				case .blue:
-#if DEBUG
-					print("Switching color to 🔵")
-#endif
-					discreteRedLed.logicalValue = false
-					discreteGreenLed.logicalValue = false
-					discreteBlueLed.logicalValue = true
-				case .off:
-#if DEBUG
-					print("Switching leds off ⚪️")
-#endif
-					discreteRedLed.logicalValue = false
-					discreteGreenLed.logicalValue = false
-					discreteBlueLed.logicalValue = false
-			}
 		}
 	}
 	

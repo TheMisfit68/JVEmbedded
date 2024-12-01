@@ -9,13 +9,16 @@ let package = Package(
 		.macOS("10.15"),
 	],
 	products: [
-		.library(name: "dummyTarget", targets: ["dummyTarget"]),
+		// This package doesn't actually build anything,
+		// The build process is configured with CMake and executed using idf.py from the terminal
+			.library(name: "SPMdummyTarget", targets: ["SPMdummyTarget"])
 	],
-	dependencies: [
+	dependencies:[
+		.package(path: "~/Documents/Development/Projects/Personal/Embedded Controllers/MatTerMaster"),
 	],
 	targets: [
 		.target(
-			name: "dummyTarget"
+			name: "SPMdummyTarget"
 		)
 	]
 )

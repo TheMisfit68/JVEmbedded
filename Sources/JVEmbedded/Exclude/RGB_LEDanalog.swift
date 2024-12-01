@@ -1,5 +1,5 @@
 // RGB_LEDAnalog.swift
-// JVIDF
+// JVembedded
 //
 // Created by Jan Verrept on 05/11/2024.
 //

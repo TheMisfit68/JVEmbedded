@@ -1,11 +1,11 @@
 // GPIO.swift
+// JVembedded
 //
-// A blend of human creativity by TheMisfit68 and
-// AI assistance from ChatGPT.
-// Crafting the future, one line of Swift at a time.
-// Copyright © 2023 Jan Verrept. All rights reserved.
+// Created by Jan Verrept on 05/11/2024.
+//
 
 // Digital Logic Enum for input/output inversion
+// Can be used as a inverter using XOR
 enum DigitalLogic: Int {
 	case straight
 	case inverse
@@ -41,16 +41,17 @@ struct DigitalInput: GPIO {
 			fatalError("GPIO reset failed")
 		}
 		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT) == ESP_OK,
-			  gpio_pullup_en(gpioPinNumber) == ESP_OK,
+			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
 			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK,
 			  gpio_set_intr_type(gpioPinNumber, GPIO_INTR_DISABLE) == ESP_OK else {
 			fatalError("Digital input configuration failed")
 		}
 	}
 	
-	// Read the logical value based on the configured DigitalLogic
+	// Read the logical value based on the configured DigitalLogic,
+	// using an logical XOR as a 'controllable inverter'
 	var logicalValue: Bool {
-		return digitalLogic == .inverse ? !ioValue: ioValue
+		return (ioValue ^^ (digitalLogic == .inverse)) // Boolean XOR to invert the bit based on the logic set
 	}
 	
 	var ioValue: Bool {
@@ -74,7 +75,8 @@ struct DigitalOutput: GPIO {
 			fatalError("GPIO reset failed")
 		}
 		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT_OUTPUT) == ESP_OK,
-			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK else {
+			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
+			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK else{
 			fatalError("Digital output configuration failed")
 		}
 	}
@@ -82,8 +84,9 @@ struct DigitalOutput: GPIO {
 	// Write the logical value based on the configured DigitalLogic
 	public var logicalValue: Bool = false {
 		didSet {
-			// Passing the logical value to the IO level, preserving the DigitalLogic behind it
-			ioValue = (digitalLogic == .inverse ? !logicalValue : logicalValue)
+			// Passing the logical value to the IO level, preserving the DigitalLogic behind it,
+			// using a logical XOR as a 'controllable inverter'
+			ioValue = (logicalValue ^^ (digitalLogic == .inverse))
 		}
 	}
 	
@@ -97,7 +100,6 @@ struct DigitalOutput: GPIO {
 		set {
 			let newGpioValue: UInt32 = newValue ? 1 : 0
 			gpio_set_level(gpioPinNumber, newGpioValue)
-			
 		}
 	}
 }
@@ -118,7 +120,7 @@ struct AlarmInput: GPIO {
 			fatalError("GPIO reset failed")
 		}
 		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT) == ESP_OK,
-			  gpio_pullup_en(gpioPinNumber) == ESP_OK,
+			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
 			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK,
 			  gpio_set_intr_type(gpioPinNumber, GPIO_INTR_POSEDGE) == ESP_OK else {
 			fatalError("Alarm input configuration failed")

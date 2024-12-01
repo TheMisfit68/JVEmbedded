@@ -11,14 +11,15 @@ let package = Package(
 	products: [
 		// This package doesn't actually build anything,
 		// The build process is configured with CMake and executed using idf.py from the terminal
-			.library(name: "SPMdummyTarget", targets: ["SPMdummyTarget"])
+			.library(name: "JVEmbedded", targets: ["JVEmbedded"]),
 	],
 	dependencies:[
 		.package(path: "~/Documents/Development/Projects/Personal/Embedded Controllers/MatTerMaster"),
 	],
 	targets: [
 		.target(
-			name: "SPMdummyTarget"
+			name: "JVEmbedded",
+			exclude: ["Exclude"]
 		)
 	]
 )

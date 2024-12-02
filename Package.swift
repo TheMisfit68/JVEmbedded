@@ -15,6 +15,8 @@ let package = Package(
 	],
 	dependencies:[
 		.package(path: "~/Documents/Development/Projects/Personal/Embedded Controllers/MatTerMaster"),
+		// Just pull in some extra Embedded examples from Apple
+		.package(url: "https://github.com/apple/swift-embedded-examples.git", branch: "main")
 	],
 	targets: [
 		.target(

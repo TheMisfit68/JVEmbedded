@@ -1,13 +1,13 @@
 # Ignore build directories and artifacts
-Sources/*/Exclude/managed_components/
-Sources/*/Exclude/build
+Sources/*/managed_components/
+Sources/*/build
 
-# Ignore files
+# Ignore specific files
 bookmarks.plist
+PrivateToDo.md
 
 # Ignore extensions
 .DS_Store
 .swiftpm
 .vscode
 .xcuserstate
-.swiftpm

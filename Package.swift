@@ -1,5 +1,14 @@
-// swift-tools-version: 6.0
-// The swift-tools-version declares the minimum version of Swift required to build this package.
+// swift-tools-version:6.0
+
+// The JVEmbedded package is an embedded codebase designed for execution on ESP32 devices.
+// The build process is managed entirely by CMake and executed using idf.py from the terminal.
+//
+// SPM is utilized exclusively for source file organization, dependency management,
+// and documentation purposes. The actual building and flashing of the firmware
+// are not handled within SPM or Xcode.
+//
+// © 2023 Jan Verrept. All rights reserved.
+//
 
 import PackageDescription
 
@@ -9,19 +18,17 @@ let package = Package(
 		.macOS("10.15"),
 	],
 	products: [
-		// This package doesn't actually build anything,
-		// The build process is configured with CMake and executed using idf.py from the terminal
-			.library(name: "JVEmbedded", targets: ["JVEmbedded"]),
+			.library(name: "JVEmbedded", targets: ["JVEmbedded"])
 	],
 	dependencies:[
+		// A Swift plugin package that might be useful in future
 		.package(path: "~/Documents/Development/Projects/Personal/Embedded Controllers/MatTerMaster"),
-		// Just pull in some extra Embedded examples from Apple
-		.package(url: "https://github.com/apple/swift-embedded-examples.git", branch: "main")
 	],
 	targets: [
 		.target(
 			name: "JVEmbedded",
-			exclude: ["Exclude"]
+			sources: ["dummyFile.swift"]
 		)
 	]
 )
+

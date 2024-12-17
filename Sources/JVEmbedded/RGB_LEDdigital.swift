@@ -1,17 +1,19 @@
-// DiscreteRGBblinker.swift
-// JVembedded
+// RGB_LEDdigital.swift
+// JVIDF
 //
 // Created by Jan Verrept on 05/11/2024.
 //
 
 class RGB_LEDdigital {
 	
-	enum RGBColor: String, CaseIterable {
-		case red = "🔴"
-		case green = "🟢"
-		case blue = "🔵"
-		case off = "⚫️"
-
+	enum RGBColor:CaseIterable {
+		
+		case red
+		case green
+		case blue
+		case off
+		
+		
 		// Method to get the next color in the sequence
 		func next() -> RGBColor {
 			
@@ -23,6 +25,16 @@ class RGB_LEDdigital {
 			}
 			return .off
 		}
+		
+		// Computed property for emoji representation of the color
+		var representation: String {
+			switch self {
+				case .red: return "🔴"
+				case .green: return "🟢"
+				case .blue: return "🔵"
+				case .off: return "⚪️"
+			}
+		}
 	}
 	
 	public var enabled: Bool = false {
@@ -33,15 +45,12 @@ class RGB_LEDdigital {
 		}
 	}
 	
-	public var color: RGBColor = .off {
+	public var color: RGBColor{
 		didSet {
-					discreteRedLed.logicalValue = (color == .red)
-					discreteGreenLed.logicalValue = (color == .green)
-					discreteBlueLed.logicalValue = (color == .blue)
-#if DEBUG
-					let colorRepresentation:String = color.rawValue
-					print("Switching color to \(colorRepresentation)")
-#endif
+			print("Switching color to \(color.representation)")
+			discreteRedLed.logicalValue = (color == .red)
+			discreteGreenLed.logicalValue = (color == .green)
+			discreteBlueLed.logicalValue = (color == .blue)
 		}
 	}
 	
@@ -53,6 +62,7 @@ class RGB_LEDdigital {
 		self.discreteRedLed = DigitalOutput(redPin)
 		self.discreteGreenLed = DigitalOutput(greenPin)
 		self.discreteBlueLed = DigitalOutput(bluePin)
+		self.color = .off // Safe to initialize after LED properties
 	}
 	
 	// Method to select the next color

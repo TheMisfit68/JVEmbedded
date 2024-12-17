@@ -1,4 +1,4 @@
-// RGB_LEDAnalog.swift
+// RGB_LEDanalog.swift
 // JVembedded
 //
 // Created by Jan Verrept on 05/11/2024.
@@ -9,7 +9,7 @@ public struct PWMConfiguration {
 	let channel: Int
 }
 
-final class RGB_LEDAnalog {
+final class RGB_LEDanalog {
 	
 	private var redLed: PWMOutput
 	private var greenLed: PWMOutput

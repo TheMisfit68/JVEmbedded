@@ -5,12 +5,6 @@
 //  Created by Jan Verrept on 24/12/2020.
 //
 
-
-// Ebools should only be used on stored Boolean properties,
-// never on calculated properties (copy if needed)!!!
-
-import Foundation
-
 public typealias EdgeDetection = EBool
 
 public class EBool{

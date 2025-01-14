@@ -3,161 +3,177 @@
 //
 // Created by Jan Verrept on 05/11/2024.
 //
+// A blend of human creativity by TheMisfit68 and
+// AI assistance from ChatGPT.
+// Crafting the future, one line of Swift at a time.
+// Copyright © 2023 Jan Verrept. All rights reserved.
+//
 
-// Digital Logic Enum for input/output inversion
-// Can be used as a inverter using XOR
+
+// Base class to standardize GPIO configurations
+class GPIO {
+	typealias GPIOpinNumber = gpio_num_t
+	
+	let pinNumber: Int
+	var gpioPinNumber: GPIOpinNumber {
+		GPIOpinNumber(Int32(pinNumber))
+	}
+	
+	init(_ pinNumber: Int) {
+		self.pinNumber = pinNumber
+	}
+	
+	func configureGPIO() {
+		fatalError("This method should be overridden in subclasses")
+	}
+	
+	func resetPin() {
+		guard gpio_reset_pin(self.gpioPinNumber) == ESP_OK else {
+			fatalError("GPIO reset failed")
+		}
+	}
+}
+
+// Enum for Digital Logic
 enum DigitalLogic: Int {
 	case straight
 	case inverse
 }
 
-// Protocol to standardize basic GPIO configurations
-protocol GPIO {
-	typealias GPIOpinNumber = gpio_num_t
-	var pinNumber: Int { get }
-	var gpioPinNumber: GPIOpinNumber { get }
-	func configureGPIO()
+protocol GPIOedgeDelegate: AnyObject {
+	func onPositiveEdge()
+	func onNegativeEdge()
 }
 
-extension GPIO {
-	var gpioPinNumber: GPIOpinNumber {
-		GPIOpinNumber(Int32(pinNumber))
-	}
-}
-
-// DigitalInput GPIO configuration
-struct DigitalInput: GPIO {
-	let pinNumber: Int
-	let digitalLogic: DigitalLogic
+// Subclass for Digital Input
+class DigitalInput: GPIO {
 	
-	init(_ pinNumber: Int, logic: DigitalLogic = .straight) {
-		self.pinNumber = pinNumber
-		self.digitalLogic = logic
-		configureGPIO()
-	}
-	
-	func configureGPIO() {
-		guard (gpio_reset_pin(self.gpioPinNumber) == ESP_OK) else {
-			fatalError("GPIO reset failed")
+	enum InterruptType {
+		case positiveEdge
+		case negativeEdge
+		case anyEdge
+		case none
+		
+		var rawValue: gpio_int_type_t {
+			switch self {
+				case .positiveEdge: return GPIO_INTR_POSEDGE
+				case .negativeEdge: return GPIO_INTR_NEGEDGE
+				case .anyEdge: return GPIO_INTR_ANYEDGE
+				case .none: return GPIO_INTR_DISABLE
+			}
 		}
+	}
+	
+	let digitalLogic: DigitalLogic
+	let interruptType: InterruptType
+	var delegate: GPIOedgeDelegate?
+	private var previousLogicalValue: Bool!
+	
+	init(_ pinNumber: Int, logic: DigitalLogic = .straight, interruptType: InterruptType = .none) {
+		self.digitalLogic = logic
+		self.interruptType = interruptType
+		super.init(pinNumber)
+		configureGPIO()
+		self.previousLogicalValue = logicalValue
+	}
+	
+	override func configureGPIO() {
+		resetPin()
 		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT) == ESP_OK,
 			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
 			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK,
-			  gpio_set_intr_type(gpioPinNumber, GPIO_INTR_DISABLE) == ESP_OK else {
+			  gpio_set_intr_type(gpioPinNumber, interruptType.rawValue) == ESP_OK else {
 			fatalError("Digital input configuration failed")
+		}
+		if delegate != nil && interruptType != .none {
+			startEdgeDetectionService()
 		}
 	}
 	
-	// Read the logical value based on the configured DigitalLogic,
-	// using an logical XOR as a 'controllable inverter'
-	var logicalValue: Bool {
-		return (ioValue ^^ (digitalLogic == .inverse)) // Boolean XOR to invert the bit based on the logic set
+	public var logicalValue: Bool {
+		ioValue ^^ (digitalLogic == .inverse)
 	}
 	
-	var ioValue: Bool {
-		return ( gpio_get_level(gpioPinNumber) == 1 )
+	private var ioValue: Bool {
+		gpio_get_level(gpioPinNumber) == 1
+	}
+	
+	private func startEdgeDetectionService() {
+		gpio_install_isr_service(0)
+		gpio_isr_handler_add(gpioPinNumber, { arg in
+			guard let rawPointer = arg else { return }
+			let instance = Unmanaged<DigitalInput>.fromOpaque(rawPointer).takeUnretainedValue()
+			instance.handleInterrupt()
+		}, Unmanaged.passUnretained(self).toOpaque())
+	}
+	
+	private func handleInterrupt() {
+		guard let delegate else { return }
+		if !previousLogicalValue && logicalValue {
+			delegate.onPositiveEdge()
+		} else if previousLogicalValue && !logicalValue {
+			delegate.onNegativeEdge()
+		} else {
+			return
+		}
+		previousLogicalValue = logicalValue
 	}
 }
 
-// DigitalOutput GPIO configuration
-struct DigitalOutput: GPIO {
-	let pinNumber:Int
+// Subclass for Digital Output
+class DigitalOutput: GPIO {
 	let digitalLogic: DigitalLogic
 	
+	
 	init(_ pinNumber: Int, logic: DigitalLogic = .straight) {
-		self.pinNumber = pinNumber
 		self.digitalLogic = logic
+		super.init(pinNumber)
 		configureGPIO()
 	}
 	
-	func configureGPIO() {
-		guard (gpio_reset_pin(self.gpioPinNumber) == ESP_OK) else {
-			fatalError("GPIO reset failed")
-		}
-		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT_OUTPUT) == ESP_OK,
+	override func configureGPIO() {
+		resetPin()
+		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_OUTPUT) == ESP_OK,
 			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
-			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK else{
+			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK else {
 			fatalError("Digital output configuration failed")
 		}
 	}
 	
-	// Write the logical value based on the configured DigitalLogic
 	public var logicalValue: Bool = false {
 		didSet {
-			// Passing the logical value to the IO level, preserving the DigitalLogic behind it,
-			// using a logical XOR as a 'controllable inverter'
-			ioValue = (logicalValue ^^ (digitalLogic == .inverse))
+			ioValue = logicalValue ^^ (digitalLogic == .inverse)
 		}
 	}
 	
-	// IO value that reflects the hardware state
-	public var ioValue: Bool {
+	private var ioValue: Bool {
 		get {
-			let gpioValue = gpio_get_level(gpioPinNumber)
-			return (gpioValue == 1)
-			
+			gpio_get_level(gpioPinNumber) == 1
 		}
 		set {
-			let newGpioValue: UInt32 = newValue ? 1 : 0
-			gpio_set_level(gpioPinNumber, newGpioValue)
+			gpio_set_level(gpioPinNumber, newValue ? 1 : 0)
 		}
 	}
 }
 
-// AlarmInput GPIO configuration
-struct AlarmInput: GPIO {
-	let pinNumber: Int
-	let digitalLogic: DigitalLogic
+// Subclass for PWM Output
+class PWMOutput: GPIO {
+	private static let frequency: UInt32 = 5000
+	private static let maxScale: UInt32 = 8192
 	
-	init(_ pinNumber: Int, logic: DigitalLogic = .straight) {
-		self.pinNumber = pinNumber
-		self.digitalLogic = logic
-		configureGPIO()
-	}
-	
-	func configureGPIO() {
-		guard (gpio_reset_pin(self.gpioPinNumber) == ESP_OK) else {
-			fatalError("GPIO reset failed")
-		}
-		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT) == ESP_OK,
-			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
-			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK,
-			  gpio_set_intr_type(gpioPinNumber, GPIO_INTR_POSEDGE) == ESP_OK else {
-			fatalError("Alarm input configuration failed")
-		}
-	}
-}
-
-struct PWMOutput: GPIO {
-	
-	static public func installFadingService() {
-		// Install the fade service
-		guard ledc_fade_func_install(0) == ESP_OK else {
-			fatalError("Failed to install LEDC fade service")
-		}
-	}
-	
-	private static let frequency: UInt32 = 5000 // Constant frequency of 5 kHz
-	private static let maxScale: UInt32 = 8192  // Top scale at a 13-bit resolution
-	
-	let pinNumber: Int
-	private var pwmChannel: ledc_channel_t
+	private let pwmChannel: ledc_channel_t
 	private var percentage: Int = 50 {
 		didSet {
-			// Clamp between 0 and 100
 			percentage = min(100, max(0, percentage))
 		}
 	}
 	
 	private var dutyCycle: UInt32 {
-		return UInt32((Double(percentage) / 100.0) * Double(PWMOutput.maxScale))
+		UInt32((Double(percentage) / 100.0) * Double(Self.maxScale))
 	}
 	
 	init(_ pinNumber: Int, channelNumber: Int, percentage: Int = 50) {
-		self.pinNumber = pinNumber
 		self.percentage = percentage
-		
-		// Set pwmChannel based on channelNumber
 		switch channelNumber {
 			case 0: pwmChannel = LEDC_CHANNEL_0
 			case 1: pwmChannel = LEDC_CHANNEL_1
@@ -165,24 +181,19 @@ struct PWMOutput: GPIO {
 			case 3: pwmChannel = LEDC_CHANNEL_3
 			case 4: pwmChannel = LEDC_CHANNEL_4
 			case 5: pwmChannel = LEDC_CHANNEL_5
-			default:
-				fatalError("Invalid channel number. Must be between 0 and 7.")
+			default: fatalError("Invalid channel number")
 		}
-		
+		super.init(pinNumber)
 		configureGPIO()
 	}
 	
-	func configureGPIO() {
-		
-		guard gpio_reset_pin(self.gpioPinNumber) == ESP_OK else {
-			fatalError("GPIO reset failed")
-		}
-		
+	override func configureGPIO() {
+		resetPin()
 		var timerConfig = ledc_timer_config_t(
 			speed_mode: LEDC_LOW_SPEED_MODE,
 			duty_resolution: LEDC_TIMER_13_BIT,
 			timer_num: LEDC_TIMER_0,
-			freq_hz: PWMOutput.frequency,
+			freq_hz: Self.frequency,
 			clk_cfg: LEDC_AUTO_CLK,
 			deconfigure: false
 		)
@@ -205,27 +216,21 @@ struct PWMOutput: GPIO {
 		}
 	}
 	
-	mutating func setPercentage(to newPercentage: Int) {
-		self.percentage = newPercentage
+	func setPercentage(to newPercentage: Int) {
+		percentage = newPercentage
 		guard ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, dutyCycle) == ESP_OK else {
-			fatalError("Failed to set LEDC duty")
+			fatalError("Failed to set duty")
 		}
 		guard ledc_update_duty(LEDC_LOW_SPEED_MODE, pwmChannel) == ESP_OK else {
-			fatalError("Failed to update LEDC duty")
+			fatalError("Failed to update duty")
 		}
 	}
 	
-	// Fade to a specified percentage over a given duration in milliseconds
-	mutating func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
-		// Set percentage, which will clamp it between 0 and 100
-		self.percentage = targetPercentage
-		
-		// Use the clamped `dutyCycle` value for fading
-		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, dutyCycle, Int32(durationMs)) == ESP_OK else {
-			fatalError("Failed to set LEDC fade")
-		}
-		guard ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
-			fatalError("Failed to start LEDC fade")
+	func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
+		percentage = targetPercentage
+		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, dutyCycle, Int32(durationMs)) == ESP_OK,
+			  ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
+			fatalError("Failed to fade duty cycle")
 		}
 	}
 }

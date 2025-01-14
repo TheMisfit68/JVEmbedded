@@ -5,7 +5,6 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
-import Foundation
 
 /// A reusable timer class for embedded Swift using ESP-IDF's `esp_timer`.
 class Timer {

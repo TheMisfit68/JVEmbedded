@@ -14,7 +14,7 @@ protocol PushButtonDelegate: AnyObject {
 
 class PushButton: GPIOedgeDelegate {
 	
-	private var digitalInput: DigitalInput
+	public var digitalInput: DigitalInput
 	
 	// Configurable intervals and durations (in seconds)
 	private var multipleClickInterval: TimeInterval = 0.5 // 500 milliseconds

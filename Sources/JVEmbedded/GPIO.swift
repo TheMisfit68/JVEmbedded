@@ -66,12 +66,21 @@ class DigitalInput: GPIO {
 	
 	let digitalLogic: DigitalLogic
 	let interruptType: InterruptType
-	var delegate: GPIOedgeDelegate?
+	var delegate: GPIOedgeDelegate? {
+		didSet {
+			if delegate != nil && interruptType != .none {
+				startEdgeDetectionService()
+			}
+		}
+	}
+	private var debounceTimer: Timer?
+	private var debounceDuration: TimeInterval = 0.05 // Default debounce duration in seconds
 	private var previousLogicalValue: Bool!
 	
-	init(_ pinNumber: Int, logic: DigitalLogic = .straight, interruptType: InterruptType = .none) {
+	init(_ pinNumber: Int, logic: DigitalLogic = .straight, interruptType: InterruptType = .none, debounceDuration: TimeInterval = 0.05) {
 		self.digitalLogic = logic
 		self.interruptType = interruptType
+		self.debounceDuration = debounceDuration
 		super.init(pinNumber)
 		configureGPIO()
 		self.previousLogicalValue = logicalValue
@@ -108,15 +117,17 @@ class DigitalInput: GPIO {
 	}
 	
 	private func handleInterrupt() {
-		guard let delegate else { return }
-		if !previousLogicalValue && logicalValue {
-			delegate.onPositiveEdge()
-		} else if previousLogicalValue && !logicalValue {
-			delegate.onNegativeEdge()
-		} else {
-			return
+		debounceTimer?.stop() // Stop any running debounce timer
+		debounceTimer = Timer(name: "DebounceTimer", delay: debounceDuration) { [self] in
+			let currentLogicalValue = logicalValue
+			if !previousLogicalValue && currentLogicalValue {
+				delegate?.onPositiveEdge()
+			} else if previousLogicalValue && !currentLogicalValue {
+				delegate?.onNegativeEdge()
+			}
+			previousLogicalValue = currentLogicalValue
 		}
-		previousLogicalValue = logicalValue
+		debounceTimer?.start()
 	}
 }
 

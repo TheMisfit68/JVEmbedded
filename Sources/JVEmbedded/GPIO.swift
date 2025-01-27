@@ -90,7 +90,7 @@ class DigitalInput: GPIO {
 		resetPin()
 		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_INPUT) == ESP_OK,
 			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
-			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK,
+			  gpio_pulldown_en(gpioPinNumber) == ESP_OK, // Enable pull-down to prevent floating input
 			  gpio_set_intr_type(gpioPinNumber, interruptType.rawValue) == ESP_OK else {
 			fatalError("Digital input configuration failed")
 		}

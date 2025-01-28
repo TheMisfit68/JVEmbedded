@@ -6,6 +6,7 @@
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
 protocol PushButtonDelegate: AnyObject {
+	func onClickSequenceStarted()
 	func onClick()
 	func onDoubleClick()
 	func onLongPress()
@@ -50,7 +51,9 @@ class PushButton: GPIOedgeDelegate {
 	}
 	
 	func onPositiveEdge() {
+		// Notify the delegate when a click sequence starts
 		if currentClickCount == 0 {
+			handleSequenceStart()
 			multipleClickTimer.start()
 		}
 		multipleClickTimer.restart()
@@ -59,6 +62,10 @@ class PushButton: GPIOedgeDelegate {
 	
 	func onNegativeEdge() {
 		longPressTimer.stop()
+	}
+	
+	private func handleSequenceStart() {
+		delegate?.onClickSequenceStarted()
 	}
 	
 	private func parseMultipleClickCount() {
@@ -76,23 +83,52 @@ class PushButton: GPIOedgeDelegate {
 	
 	private func handleSingleClick() {
 		delegate?.onClick()
-		print("👉🔘 Single click detected")
 	}
 	
 	private func handleDoubleClick() {
 		delegate?.onDoubleClick()
 		delegate?.onMultipleClicks(count: 2)
-		print("👉🔘👉🔘 Double click detected")
 	}
 	
 	private func handleLongPress() {
 		delegate?.onLongPress()
-		print("⏱️👉🔘 Long press detected")
 	}
 	
 	private func handleMultipleClicks() {
-		print("👉🔘👉🔘…👉🔘 Multiple clicks detected: \(currentClickCount)")
 		delegate?.onMultipleClicks(count: currentClickCount)
 	}
 	
+}
+
+extension PushButtonDelegate {
+	
+	func onClickSequenceStarted() {
+#if DEBUG
+		print("👉❓ Click sequence started")
+#endif
+	}
+	
+	func onClick() {
+#if DEBUG
+		print("👉🔘 Single click detected")
+#endif
+	}
+	
+	func onDoubleClick() {
+#if DEBUG
+		print("👉🔘👉🔘 Double click detected")
+#endif
+	}
+	
+	func onLongPress() {
+#if DEBUG
+		print("⏱️👉🔘 Long press detected")
+#endif
+	}
+	
+	func onMultipleClicks(count: Int) {
+#if DEBUG
+		print("👉🔘👉🔘…👉🔘 Multiple clicks detected: \(count)")
+#endif
+	}
 }

@@ -5,24 +5,24 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
-protocol PushButtonDelegate: AnyObject {
-	func onClickSequenceStarted()
+public protocol PushButtonDelegate: AnyObject {
 	func onClick()
 	func onDoubleClick()
 	func onLongPress()
 	func onMultipleClicks(count: Int)
 }
 
-class PushButton: GPIOedgeDelegate {
+open class PushButton: GPIOedgeDelegate {
 	
 	public var digitalInput: DigitalInput
 	
 	// Configurable intervals and durations (in seconds)
 	private var multipleClickInterval: TimeInterval = 0.5 // 500 milliseconds
 	private var multipleClickTimer: Timer!
+	private var longPressDuration: TimeInterval = 1.0 // 1 second
 	private var longPressTimer: Timer!
 	
-	private var currentClickCount: Int = 0
+	open var currentClickCount: Int = 0
 	public var delegate: PushButtonDelegate?
 	
 	init(pinNumber: Int, logic: DigitalLogic = .straight) {
@@ -42,8 +42,10 @@ class PushButton: GPIOedgeDelegate {
 			}
 		}
 		
-		self.longPressTimer = Timer(name: "PushButton.longPressTimer", delay: 1.0) {
+		self.longPressTimer = Timer(name: "PushButton.longPressTimer", delay: longPressDuration) {
 			self.handleLongPress()
+			self.multipleClickTimer.stop()
+			self.currentClickCount = 0
 		}
 		
 		// Set the delegate after everything is initialized
@@ -51,21 +53,14 @@ class PushButton: GPIOedgeDelegate {
 	}
 	
 	func onPositiveEdge() {
-		// Notify the delegate when a click sequence starts
-		if currentClickCount == 0 {
-			handleSequenceStart()
-			multipleClickTimer.start()
-		}
-		multipleClickTimer.restart()
+		longPressTimer.start()
+		multipleClickTimer.start()
+		
 		currentClickCount += 1
 	}
 	
 	func onNegativeEdge() {
 		longPressTimer.stop()
-	}
-	
-	private func handleSequenceStart() {
-		delegate?.onClickSequenceStarted()
 	}
 	
 	private func parseMultipleClickCount() {
@@ -100,33 +95,27 @@ class PushButton: GPIOedgeDelegate {
 	
 }
 
-extension PushButtonDelegate {
+extension PushButton: PushButtonDelegate {
 	
-	func onClickSequenceStarted() {
-#if DEBUG
-		print("👉❓ Click sequence started")
-#endif
-	}
-	
-	func onClick() {
+	public func onClick() {
 #if DEBUG
 		print("👉🔘 Single click detected")
 #endif
 	}
 	
-	func onDoubleClick() {
+	public func onDoubleClick() {
 #if DEBUG
 		print("👉🔘👉🔘 Double click detected")
 #endif
 	}
 	
-	func onLongPress() {
+	public func onLongPress() {
 #if DEBUG
 		print("⏱️👉🔘 Long press detected")
 #endif
 	}
 	
-	func onMultipleClicks(count: Int) {
+	public func onMultipleClicks(count: Int) {
 #if DEBUG
 		print("👉🔘👉🔘…👉🔘 Multiple clicks detected: \(count)")
 #endif

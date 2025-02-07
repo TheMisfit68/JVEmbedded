@@ -11,7 +11,7 @@
 
 
 // Base class to standardize GPIO configurations
-class GPIO {
+public class GPIO {
 	typealias GPIOpinNumber = gpio_num_t
 	
 	let pinNumber: Int
@@ -46,7 +46,7 @@ protocol GPIOedgeDelegate: AnyObject {
 }
 
 // Subclass for Digital Input
-class DigitalInput: GPIO {
+public final class DigitalInput: GPIO {
 	
 	enum InterruptType {
 		case positiveEdge
@@ -132,7 +132,7 @@ class DigitalInput: GPIO {
 }
 
 // Subclass for Digital Output
-class DigitalOutput: GPIO {
+public final class DigitalOutput: GPIO {
 	let digitalLogic: DigitalLogic
 	
 	
@@ -168,7 +168,7 @@ class DigitalOutput: GPIO {
 }
 
 // Subclass for PWM Output
-class PWMOutput: GPIO {
+public final class PWMOutput: GPIO {
 	private static let frequency: UInt32 = 5000
 	private static let maxScale: UInt32 = 8192
 	

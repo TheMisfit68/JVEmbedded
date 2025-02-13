@@ -5,7 +5,7 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
-public protocol PushButtonDelegate: AnyObject {
+protocol PushButtonDelegate: AnyObject {
 	func onClick()
 	func onDoubleClick()
 	func onLongPress()
@@ -15,87 +15,67 @@ public protocol PushButtonDelegate: AnyObject {
 open class PushButton: GPIOedgeDelegate {
 	
 	public var digitalInput: DigitalInput
-	
-	// Configurable intervals and durations (in seconds)
-	private var multipleClickInterval: TimeInterval = 0.5 // 500 milliseconds
-	private var multipleClickTimer: Timer!
-	private var longPressDuration: TimeInterval = 1.0 // 1 second
+	private var clickIncrementInterval: TimeInterval = 0.5
+	private var clickIncrementTimer: Timer!
+	private var longPressDuration: TimeInterval = 1.0
 	private var longPressTimer: Timer!
 	
 	open var currentClickCount: Int = 0
-	public var delegate: PushButtonDelegate?
+	private var autoIncrementActive: Bool {
+		// Enable autoincrement only if the current click was never released
+		longPressTimer.isRunning
+	}
+	var delegate: PushButtonDelegate?
 	
 	init(pinNumber: Int, logic: DigitalLogic = .straight) {
-		
-		// Phase 1: Initialize stored properties
 		self.digitalInput = DigitalInput(pinNumber, logic: logic, interruptType: .anyEdge)
 		
-		// Phase 2: Initialize timers after `self` is fully initialized
-		self.multipleClickTimer = Timer(name: "PushButton.multipleClickTimer", delay: multipleClickInterval) {
-			
-			// Either the button was kept pressed all the time and the clickcount just goes up
-			if self.longPressTimer.isRunning {
-				self.currentClickCount += 1
-			}else{
-				// Or the button was released at some time and the clickcount should be parsed
-				self.parseMultipleClickCount()
-			}
+		self.clickIncrementTimer = Timer(name: "PushButton.clickIncrementTimer", delay: clickIncrementInterval) {
+			self.parseCurrentClickCount()
 		}
 		
 		self.longPressTimer = Timer(name: "PushButton.longPressTimer", delay: longPressDuration) {
-			self.handleLongPress()
-			self.multipleClickTimer.stop()
+			self.delegate?.onLongPress()
+			self.clickIncrementTimer.stop()
 			self.currentClickCount = 0
 		}
 		
-		// Set the delegate after everything is initialized
 		self.digitalInput.delegate = self
 	}
 	
 	func onPositiveEdge() {
+		clickIncrementTimer.start()
 		longPressTimer.start()
-		multipleClickTimer.start()
-		
 		currentClickCount += 1
 	}
 	
 	func onNegativeEdge() {
+		clickIncrementTimer.stop()
 		longPressTimer.stop()
 	}
 	
-	private func parseMultipleClickCount() {
-		
-		if currentClickCount == 1 {
-			handleSingleClick()
-		} else if currentClickCount == 2 {
-			handleDoubleClick()
-		} else if currentClickCount > 2 {
-			handleMultipleClicks()
+	func parseCurrentClickCount() {
+		if self.autoIncrementActive {
+			self.currentClickCount += 1
+		} else {
+			clickIncrementTimer.stop()
+			switch currentClickCount {
+				case 1:
+					delegate?.onClick()
+				case 2:
+					delegate?.onMultipleClicks(count: 2)
+					delegate?.onDoubleClick()
+				default:
+					if currentClickCount > 2 {
+						delegate?.onMultipleClicks(count: currentClickCount)
+					}
+			}
+			currentClickCount = 0
 		}
-		multipleClickTimer.stop()
-		currentClickCount = 0
 	}
-	
-	private func handleSingleClick() {
-		delegate?.onClick()
-	}
-	
-	private func handleDoubleClick() {
-		delegate?.onDoubleClick()
-		delegate?.onMultipleClicks(count: 2)
-	}
-	
-	private func handleLongPress() {
-		delegate?.onLongPress()
-	}
-	
-	private func handleMultipleClicks() {
-		delegate?.onMultipleClicks(count: currentClickCount)
-	}
-	
 }
 
-extension PushButton: PushButtonDelegate {
+extension PushButtonDelegate {
 	
 	public func onClick() {
 #if DEBUG

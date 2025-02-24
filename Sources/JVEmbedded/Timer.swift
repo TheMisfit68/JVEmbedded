@@ -1,20 +1,11 @@
-// Timer.swift
-//
-// A blend of human creativity by Jan Verrept and
-// AI assistance from ChatGPT.
-// Crafting the future, one line of Swift at a time.
-// Copyright © 2023 Jan Verrept. All rights reserved.
-
-
-/// A reusable timer class for embedded Swift using ESP-IDF's `esp_timer`.
 class Timer {
+	public typealias TimerCallback = (Timer) -> Void  // Base class callback
 	
 	private var timerHandle: esp_timer_handle_t?
 	private let name: String
 	private let delay: TimeInterval
-	private let callback: () -> Void
+	public var callback: TimerCallback
 	
-	/// A computed property that checks if the timer is currently active.
 	var isRunning: Bool {
 		guard let timer = timerHandle else {
 			return false
@@ -22,29 +13,23 @@ class Timer {
 		return esp_timer_is_active(timer)
 	}
 	
-	/// Initialize the timer with a unique name, delay, and callback.
-	/// - Parameters:
-	///   - name: A unique name for the timer.
-	///   - delay: The delay in seconds.
-	///   - callback: The closure to execute after the delay.
-	init(name: String, delay: TimeInterval, callback: @escaping () -> Void) {
+	init(name: String, delay: TimeInterval, callback: @escaping TimerCallback) {
 		self.name = name
 		self.delay = delay
 		self.callback = callback
 	}
 	
-	/// Starts the timer.
 	func start() {
 		stop() // Ensure any existing timer is stopped
 		
-		let args = Unmanaged.passRetained(TimerCallbackWrapper(callback: callback)).toOpaque()
+		let args = Unmanaged.passRetained(TimerCallbackWrapper(timer: self, callback: callback)).toOpaque()
 		
 		name.withCString { timerName in
 			var timerConfig = esp_timer_create_args_t(
 				callback: { arg in
 					guard let arg = arg else { return }
 					let wrapper = Unmanaged<TimerCallbackWrapper>.fromOpaque(arg).takeRetainedValue()
-					wrapper.callback()
+					wrapper.callback(wrapper.timer)
 				},
 				arg: args,
 				dispatch_method: ESP_TIMER_TASK,
@@ -59,12 +44,10 @@ class Timer {
 		}
 	}
 	
-	/// Restarts the timer using the same delay and callback.
 	func restart() {
 		start()
 	}
 	
-	/// Stops the timer if it is running.
 	func stop() {
 		if let timer = timerHandle {
 			esp_timer_stop(timer)
@@ -74,14 +57,179 @@ class Timer {
 	}
 	
 	deinit {
-		stop() // Clean up the timer on deinitialization
+		stop()
 	}
 }
 
-/// A wrapper for storing the timer's callback closure.
-private class TimerCallbackWrapper {
-	let callback: () -> Void
-	init(callback: @escaping () -> Void) {
+class TimerCallbackWrapper {
+	let timer: Timer
+	let callback: (Timer) -> ()
+	
+	init(timer: Timer, callback: @escaping (Timer) -> ()) {
+		self.timer = timer
 		self.callback = callback
 	}
+}
+
+// MARK: - Digital Timers
+class OnDelayTimer: Timer {
+	typealias OnDelayTimerCallback = (OnDelayTimer) -> Void
+	
+	var input: Bool = false {
+		didSet {
+			if input {
+				start()
+			} else {
+				stop()
+				output = false
+			}
+		}
+	}
+	
+	var output: Bool = false
+	
+	override init(name: String, delay: TimeInterval, callback: @escaping OnDelayTimerCallback) {
+		let tempCallback: TimerCallback = { _ in } // Temporary placeholder callback
+		super.init(name: name, delay: delay, callback: tempCallback)
+		
+		// Adjust the actual callback after the super's initialization
+		self.callback = { [self] _ in
+			self.output = true
+			callback(self)
+		}
+	}
+	
+	func updateInput(value: Bool) {
+		input = value
+	}
+}
+
+class OffDelayTimer: Timer {
+	typealias OffDelayTimerCallback = (OffDelayTimer) -> Void
+	
+	var input: Bool = false {
+		didSet {
+			if input {
+				output = true
+				stop()
+			} else {
+				start()
+			}
+		}
+	}
+	
+	var output: Bool = false
+	
+	override init(name: String, delay: TimeInterval, callback: @escaping OffDelayTimerCallback) {
+		let tempCallback: TimerCallback = { _ in } // Temporary placeholder callback
+		super.init(name: name, delay: delay, callback: tempCallback)
+		
+		// Adjust the actual callback after the super's initialization
+		self.callback = { [self] _ in
+			self.output = false
+			callback(self)
+		}
+	}
+	
+	func updateInput(value: Bool) {
+		input = value
+	}
+}
+
+class PulseLimitingTimer: Timer {
+	typealias PulseLimitingTimerCallback = (PulseLimitingTimer) -> Void
+	
+	var input: Bool = false {
+		didSet {
+			if input {
+				start()
+			} else {
+				stop()
+				output = false
+			}
+		}
+	}
+	
+	var output: Bool = false
+	
+	override init(name: String, delay: TimeInterval, callback: @escaping PulseLimitingTimerCallback) {
+		let tempCallback: TimerCallback = { _ in } // Temporary placeholder callback
+		super.init(name: name, delay: delay, callback: tempCallback)
+		
+		// Adjust the actual callback after the super's initialization
+		self.callback = { [self] _ in
+			self.output = false
+			callback(self)
+		}
+	}
+	
+	func updateInput(value: Bool) {
+		input = value
+	}
+}
+
+class ExactPulseTimer: Timer {
+	typealias ExactPulseTimerCallback = (ExactPulseTimer) -> Void
+	
+	var input: Bool = false {
+		didSet {
+			if input {
+				start()
+			} else {
+				stop()
+				output = false
+			}
+		}
+	}
+	
+	var output: Bool = false
+	
+	override init(name: String, delay: TimeInterval, callback: @escaping ExactPulseTimerCallback) {
+		let tempCallback: TimerCallback = { _ in } // Temporary placeholder callback
+		super.init(name: name, delay: delay, callback: tempCallback)
+		
+		// Adjust the actual callback after the super's initialization
+		self.callback = { [self] _ in
+			self.output = false
+			callback(self)
+		}
+	}
+	
+	func updateInput(value: Bool) {
+		input = value
+	}
+}
+
+class Oscillator: Timer {
+	typealias OscillatorCallback = (Oscillator) -> Void
+	
+	var enable: Bool = false {
+		didSet {
+			if enable {
+				start()
+			} else {
+				stop()
+				output = false
+			}
+		}
+	}
+	
+	var output: Bool = false
+	
+	override init(name: String, delay: TimeInterval, callback: @escaping OscillatorCallback) {
+		let tempCallback: TimerCallback = { _ in } // Temporary placeholder callback
+		super.init(name: name, delay: delay, callback: tempCallback)
+		
+		// Adjust the actual callback after the super's initialization
+		self.callback = { [self] _ in
+			self.output = true
+			callback(self)
+			self.output = false
+		}
+	}
+	
+	func updateEnable(value: Bool) {
+		enable = value
+	}
+
 }

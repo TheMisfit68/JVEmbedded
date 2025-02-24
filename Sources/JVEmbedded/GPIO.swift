@@ -118,7 +118,7 @@ public final class DigitalInput: GPIO {
 	
 	private func handleInterrupt() {
 		debounceTimer?.stop() // Stop any running debounce timer
-		debounceTimer = Timer(name: "DebounceTimer", delay: debounceDuration) { [self] in
+		debounceTimer = Timer(name: "DebounceTimer", delay: debounceDuration) { [self] _ in
 			let currentLogicalValue = logicalValue
 			if !previousLogicalValue && currentLogicalValue {
 				delegate?.onPositiveEdge()
@@ -171,6 +171,13 @@ public final class DigitalOutput: GPIO {
 public final class PWMOutput: GPIO {
 	private static let frequency: UInt32 = 5000
 	private static let maxScale: UInt32 = 8192
+	
+	static public func installFadingService() {
+		// Install the fade service
+		guard ledc_fade_func_install(0) == ESP_OK else {
+			fatalError("Failed to install LEDC fade service")
+		}
+	}
 	
 	private let pwmChannel: ledc_channel_t
 	private var percentage: Int = 50 {

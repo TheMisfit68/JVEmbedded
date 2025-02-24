@@ -66,41 +66,38 @@ final class RGB_LEDanalog {
 		}
 	}
 		
-	// Method to gradually transition to the next color in a glowing effect
-	public func glow() {
-		// Only adjust the color if the LED is enabled
+	public func breath(ranges: (ClosedRange<Int>, ClosedRange<Int>, ClosedRange<Int>) = (-255...255, -255...255, -255...255)) {
 		if enabled {
-			let deltaRange: ClosedRange<Int> = -255...255
+			let (redRange, greenRange, blueRange) = ranges
 			
-			// Calculate random deltas for each color component
-			var redDelta = Int.random(in: deltaRange)
-			var greenDelta = Int.random(in: deltaRange)
-			var blueDelta = Int.random(in: deltaRange)
+			// Bereken willekeurige deltas binnen de gespecificeerde ranges
+			var redDelta = Int.random(in: redRange)
+			var greenDelta = Int.random(in: greenRange)
+			var blueDelta = Int.random(in: blueRange)
 			
-			// Calculate the new color values based on the current color and the delta
+			// Bereken de nieuwe kleurwaarden
 			var newRed = Int(color.rgb.red) + redDelta
 			var newGreen = Int(color.rgb.green) + greenDelta
 			var newBlue = Int(color.rgb.blue) + blueDelta
 			
-			// Update each color component and reverse direction if necessary
-			if newRed < 0 || newRed > 255 {
-				redDelta = -redDelta  // Reverse direction when hitting boundaries
-			}
-			if newGreen < 0 || newGreen > 255 {
-				greenDelta = -greenDelta  // Reverse direction when hitting boundaries
-			}
-			if newBlue < 0 || newBlue > 255 {
-				blueDelta = -blueDelta  // Reverse direction when hitting boundaries
-			}
+			// Omkeren als grenzen worden overschreden
+			if newRed < 0 || newRed > 255 { redDelta = -redDelta }
+			if newGreen < 0 || newGreen > 255 { greenDelta = -greenDelta }
+			if newBlue < 0 || newBlue > 255 { blueDelta = -blueDelta }
 			
-			// Ensure all components are within the valid range [0, 255]
+			// Houd de waarden binnen 0-255
 			newRed = max(0, min(255, newRed))
 			newGreen = max(0, min(255, newGreen))
 			newBlue = max(0, min(255, newBlue))
 			
-			// Create a new color with the updated values
-			let newColor = RGBColor(red: UInt8(newRed), green: UInt8(newGreen), blue: UInt8(newBlue))
-			color = newColor
+			// Update de kleur
+			color = RGBColor(red: UInt8(newRed), green: UInt8(newGreen), blue: UInt8(newBlue))
 		}
+	}
+	
+	public func flicker(intensity: Int = 50) {
+		// Kleiner bereik voor een kaarsachtig flikkereffect
+		let flickerRanges = (-intensity...intensity, -intensity/2...intensity/2, -intensity/4...intensity/4)
+		breath(ranges: flickerRanges)
 	}
 }

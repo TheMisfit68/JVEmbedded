@@ -168,6 +168,13 @@ public final class DigitalOutput: GPIO {
 }
 
 // Subclass for PWM Output
+
+// Struct to conviniently store and pass PWM configurations at the application level
+public struct PWMConfiguration {
+	let pin: Int
+	let channel: Int
+}
+
 public final class PWMOutput: GPIO {
 	private static let frequency: UInt32 = 5000
 	private static let maxScale: UInt32 = 8192

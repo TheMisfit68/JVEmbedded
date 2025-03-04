@@ -9,7 +9,7 @@
 // Extend the Bool type to add the logical XOR operator
 infix operator ^^: LogicalDisjunctionPrecedence
 
-extension Bool {
+extension Swift.Bool {
 	static func ^^(lhs: Bool, rhs: Bool) -> Bool {
 		return lhs != rhs  // XOR logic: true if different, false if same
 	}

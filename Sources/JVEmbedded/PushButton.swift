@@ -16,64 +16,63 @@ open class PushButton: GPIOedgeDelegate {
 	
 	public var digitalInput: DigitalInput
 	private var clickIncrementInterval: TimeInterval = 0.5
-	private var clickIncrementTimer: Timer!
+	private var clickIncrementTimer: Oscillator!
 	private var longPressDuration: TimeInterval = 1.0
-	private var longPressTimer: Timer!
+	private var longPressTimer: OnDelayTimer!
 	
 	open var currentClickCount: Int = 0
-	private var autoIncrementActive: Bool {
-		// Enable autoincrement only if the current click was never released
-		longPressTimer.isRunning
-	}
 	var delegate: PushButtonDelegate?
 	
 	init(pinNumber: Int, logic: DigitalLogic = .straight) {
-		self.digitalInput = DigitalInput(pinNumber, logic: logic, interruptType: .anyEdge)
 		
-		self.clickIncrementTimer = Timer(name: "PushButton.clickIncrementTimer", delay: clickIncrementInterval) {
+		self.currentClickCount = 0
+		self.digitalInput = DigitalInput(pinNumber, logic: logic, interruptType: .anyEdge)
+
+		self.clickIncrementTimer = Oscillator(name: "PushButton.clickIncrementTimer", delay: clickIncrementInterval) { [self] clickIncrementTimer in
+			if clickIncrementTimer.output {
+				self.currentClickCount += 1
+			}
 			self.parseCurrentClickCount()
 		}
 		
-		self.longPressTimer = Timer(name: "PushButton.longPressTimer", delay: longPressDuration) {
+		
+		self.longPressTimer = OnDelayTimer(name: "PushButton.longPressTimer", delay: longPressDuration) { [self] longPressTimer in
 			self.delegate?.onLongPress()
-			self.clickIncrementTimer.stop()
-			self.currentClickCount = 0
+			longPressTimer.updateInput(value: false)
 		}
 		
 		self.digitalInput.delegate = self
 	}
 	
 	func onPositiveEdge() {
-		clickIncrementTimer.start()
-		longPressTimer.start()
+		clickIncrementTimer.updateEnable(value: true)
+		longPressTimer.updateInput(value: true)
 		currentClickCount += 1
 	}
 	
 	func onNegativeEdge() {
-		clickIncrementTimer.stop()
-		longPressTimer.stop()
+		clickIncrementTimer.updateEnable(value: false)
+		longPressTimer.updateInput(value: false)
 	}
 	
 	func parseCurrentClickCount() {
-		if self.autoIncrementActive {
-			self.currentClickCount += 1
-		} else {
-			clickIncrementTimer.stop()
-			switch currentClickCount {
-				case 1:
-					delegate?.onClick()
-				case 2:
-					delegate?.onMultipleClicks(count: 2)
-					delegate?.onDoubleClick()
-				default:
-					if currentClickCount > 2 {
-						delegate?.onMultipleClicks(count: currentClickCount)
-					}
-			}
-			currentClickCount = 0
+		
+		switch currentClickCount {
+			case 1:
+				delegate?.onClick()
+			case 2:
+				delegate?.onMultipleClicks(count: 2)
+				delegate?.onDoubleClick()
+			default:
+				if currentClickCount > 2 {
+					delegate?.onMultipleClicks(count: currentClickCount)
+				}
 		}
+		currentClickCount = 0
 	}
+	
 }
+
 
 extension PushButtonDelegate {
 	

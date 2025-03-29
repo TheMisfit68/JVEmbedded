@@ -32,10 +32,9 @@ extension JVEmbedded{
 			public static let fullRange: rgbRanges = (red: 0.0...255.0, green: 0.0...255.0, blue: 0.0...255.0)
 			private var components: rgbValues {
 				didSet {
-					self.clamped(to: JVEmbedded.Color.RGB.fullRange)
-#if DEBUG
-					print("Updated RGB color to:\n\(description)")
-#endif
+					if components != oldValue {
+						self.clamp(to: JVEmbedded.Color.RGB.fullRange)
+					}
 				}
 			}
 			
@@ -56,25 +55,42 @@ extension JVEmbedded{
 			}
 			
 			public var description: String {
-				return "🔴🟢🔵\t\(self.red)\t\(self.green)\t\(self.blue)"
+				// Convert every component to a Int first because of the limitations for printing floats in embedded Swift
+				let red = Int(self.red)
+				let green = Int(self.green)
+				let blue = Int(self.blue)
+				return "🔴 🟢 🔵\t\(red)\t\(green)\t\(blue)"
+			}
+			
+			// Use a HSB color as a go between to modify the brightness on a RGB color
+			public var brightness: Float {
+				get {
+					return Color.HSB(using: self).brightness
+				}
+				set {
+					var hsbEquivalent = Color.HSB(using: self) // Convert to HSB
+					hsbEquivalent.brightness = newValue       // Modify brightness
+					self.components = Color.RGB(using: hsbEquivalent).components // Convert back
+				}
 			}
 			
 			// MARK: - Initializers
 			public init(red: Float, green: Float, blue: Float) {
 				self.components = (red, green, blue)
+				self.clamp(to: JVEmbedded.Color.RGB.fullRange)
 			}
 			
+			// Convinience initializer for HSB to RGB conversion
 			public init(using hsbColor: Color.HSB) {
+				let hue: Float = hsbColor.hue / JVEmbedded.Color.HSB.fullRange.hue.upperBound
+				let saturation: Float = hsbColor.saturation / JVEmbedded.Color.HSB.fullRange.saturation.upperBound
+				let brightness: Float = hsbColor.brightness / JVEmbedded.Color.HSB.fullRange.brightness.upperBound
 				
-				let hue = hsbColor.hue / 360.0
-				let saturation = hsbColor.saturation / 100.0
-				let brightness = hsbColor.brightness / 100.0
+				let chroma: Float = brightness * saturation
+				let secondaryComponent: Float = chroma * (1 - abs((hue * 6).truncatingRemainder(dividingBy: 2) - 1))
+				let match: Float = brightness - chroma
 				
-				let chroma = brightness * saturation
-				let secondaryComponent = chroma * (1 - abs((hue * 6).truncatingRemainder(dividingBy: 2) - 1))
-				let match = brightness - chroma
-				
-				let (red, green, blue): (Float, Float, Float)
+				let red: Float, green: Float, blue: Float
 				
 				switch Int(hue * 6) {
 					case 0:  (red, green, blue) = (chroma, secondaryComponent, 0)
@@ -93,12 +109,10 @@ extension JVEmbedded{
 				)
 			}
 			
-			private mutating func clamped(to ranges: rgbRanges) {
-				self.components = (
-					red: self.red.clamped(to: ranges.red),
-					green: self.green.clamped(to: ranges.green),
-					blue: self.blue.clamped(to: ranges.blue)
-				)
+			private mutating func clamp(to ranges: rgbRanges) {
+				self.red.clamp(to: ranges.red)
+				self.green.clamp(to: ranges.green)
+				self.blue.clamp(to: ranges.blue)
 			}
 		}
 		
@@ -119,12 +133,12 @@ extension JVEmbedded{
 			// MARK: - Constants
 			
 			// Common Colors
-			static let none = JVEmbedded.Color.HSB(hue: 0, saturation: 0, brightness: 0)
+			static let none = JVEmbedded.Color.HSB(hue: 0.0, saturation: 0.0, brightness: 0.0)
 			static let off = JVEmbedded.Color.HSB(hue: 0.0, saturation: 0.0, brightness: 0.0)
 			static let black = JVEmbedded.Color.HSB(hue: 0.0, saturation: 0.0, brightness: 0.0)
 			static let white = JVEmbedded.Color.HSB(hue: 0.0, saturation: 0.0, brightness: 100.0)
 			static let red = JVEmbedded.Color.HSB(hue: 0.0, saturation: 100.0, brightness: 100.0)
-			static let orange = JVEmbedded.Color.HSB(hue: 30.0, saturation: 100.0, brightness: 100.0)
+			static let orange = JVEmbedded.Color.HSB(hue: 20.0, saturation: 100.0, brightness: 100.0)
 			static let yellow = JVEmbedded.Color.HSB(hue: 60.0, saturation: 100.0, brightness: 100.0)
 			static let green = JVEmbedded.Color.HSB(hue: 120.0, saturation: 100.0, brightness: 100.0)
 			static let blue = JVEmbedded.Color.HSB(hue: 240.0, saturation: 100.0, brightness: 100.0)
@@ -135,15 +149,13 @@ extension JVEmbedded{
 			public static let fullRange: hsbRanges = (hue: 0.0...360.0, saturation: 0.0...100.0, brightness: 0.0...100.0)
 			private var components: hsbValues {
 				didSet {
-					self.clamped(to: JVEmbedded.Color.HSB.fullRange)
-#if DEBUG
-					print("Updating HSB color to:\n\(description)")
-#endif
+					if components != oldValue {
+						self.clamp(to: JVEmbedded.Color.HSB.fullRange)
+					}
 				}
 			}
 			
 			// MARK: - Individual computed properties
-			
 			public var hue: Float {
 				get { components.hue }
 				set { components.hue = newValue.clamped(to: JVEmbedded.Color.HSB.fullRange.hue) }
@@ -151,7 +163,7 @@ extension JVEmbedded{
 			
 			public var saturation: Float {
 				get { components.saturation }
-				set { components.saturation =  newValue.clamped(to: JVEmbedded.Color.HSB.fullRange.saturation) }
+				set { components.saturation = newValue.clamped(to: JVEmbedded.Color.HSB.fullRange.saturation) }
 			}
 			
 			public var brightness: Float {
@@ -179,7 +191,11 @@ extension JVEmbedded{
 			}
 			
 			public var description: String {
-				return "🎨🎚️🔆\t\(hue)\t\(saturation)\t\(brightness)"
+				// Convert every component to a Int first because of the limitations for printing floats in embedded Swift
+				let hue = Int(hue)
+				let saturation = Int(saturation)
+				let brightness = Int(brightness)
+				return "🎨 🎚️ 🔆\t\(hue)\t\(saturation)\t\(brightness)"
 			}
 			
 			// MARK: - Initializers
@@ -187,18 +203,19 @@ extension JVEmbedded{
 				self.components = (hue, saturation, brightness)
 			}
 			
+			// Convinience initializer for RGB to HSB conversion
 			public init(using rgbColor: Color.RGB) {
-				let red = rgbColor.red / 255.0
-				let green = rgbColor.green / 255.0
-				let blue = rgbColor.blue / 255.0
+				let red: Float = rgbColor.red / JVEmbedded.Color.RGB.fullRange.red.upperBound
+				let green: Float = rgbColor.green / JVEmbedded.Color.RGB.fullRange.green.upperBound
+				let blue: Float = rgbColor.blue / JVEmbedded.Color.RGB.fullRange.blue.upperBound
 				
-				let maxComponent = max(red, green, blue)
-				let minComponent = min(red, green, blue)
-				let delta = maxComponent - minComponent
+				let maxComponent: Float = max(red, green, blue)
+				let minComponent: Float = min(red, green, blue)
+				let delta: Float = maxComponent - minComponent
 				
 				var hue: Float = 0
 				var saturation: Float = 0
-				let brightness = maxComponent
+				let brightness: Float = maxComponent
 				
 				if delta != 0 {
 					saturation = delta / maxComponent
@@ -211,20 +228,22 @@ extension JVEmbedded{
 						hue = (red - green) / delta + 4
 					}
 					
-					hue *= 60
-					if hue < 0 { hue += 360 }
+					hue *= JVEmbedded.Color.HSB.fullRange.hue.upperBound / 6  // Adjusting to full hue range
+					if hue < 0 { hue += JVEmbedded.Color.HSB.fullRange.hue.upperBound }
 				}
 				
-				self.init(hue: hue, saturation: saturation * 100, brightness: brightness * 100)
+				self.init(
+					hue: hue,
+					saturation: saturation * JVEmbedded.Color.HSB.fullRange.saturation.upperBound,
+					brightness: brightness * JVEmbedded.Color.HSB.fullRange.brightness.upperBound
+				)
 			}
 			
 			// MARK: - Helper Method
-			public mutating func clamped(to ranges: hsbRanges) {
-				components = (
-					hue: hue.clamped(to: ranges.hue),
-					saturation: saturation.clamped(to: ranges.saturation),
-					brightness: brightness.clamped(to: ranges.brightness)
-				)
+			public mutating func clamp(to ranges: hsbRanges) {
+				self.hue.clamp(to: ranges.hue)
+				self.saturation.clamp(to: ranges.saturation)
+				self.brightness.clamp(to: ranges.brightness)
 			}
 		}
 		
@@ -235,64 +254,54 @@ extension JVEmbedded{
 // MARK: - Color Effects
 extension JVEmbedded.Color.RGB {
 	
-	// RGB Color transition (color fade effect)
-	public mutating func fade(atSpeed speed: Float = 100.0,
-							  withinRanges ranges: JVEmbedded.Color.RGB.rgbRanges) {
+	/// Randomly adjusts RGB values within specified per-channel ranges and clamps the result.
+	public static func random(in ranges: rgbRanges =
+						  (red: -255...255, green: -255...255, blue: -255...255) ) -> JVEmbedded.Color.RGB {
 		
-		// Make sure everything has a valid range
-		self.clamped(to: ranges)
-		let clampedSpeed = speed.clamped(to: 0.0...100.0)
+		// Apply random deltas
+		let red = Float.random(in: ranges.red)
+		let green = Float.random(in: ranges.green)
+		let blue = Float.random(in: ranges.blue)
 		
-		// Convert speed into a scaling factor (percentage)
-		let speedFactor = clampedSpeed / 100.0
-		
-		// Scale the ranges down by the speed factor (keeping all calculations in Float)
-		let redDeltaRange = (ranges.red.lowerBound * speedFactor)...(ranges.red.upperBound * speedFactor)
-		let greenDeltaRange = (ranges.green.lowerBound * speedFactor)...(ranges.green.upperBound * speedFactor)
-		let blueDeltaRange = (ranges.blue.lowerBound * speedFactor)...(ranges.blue.upperBound * speedFactor)
-		
-		// Get a random delta value for each color component from the ranges
-		let redDelta = Float.random(in: redDeltaRange)
-		let greenDelta = Float.random(in: greenDeltaRange)
-		let blueDelta = Float.random(in: blueDeltaRange)
-		
-		// Adjust the compononents
-		self.red += redDelta
-		self.green += greenDelta
-		self.blue += blueDelta
-		
+		// Final clamping to enforce valid RGB ranges
+		return JVEmbedded.Color.RGB(red: red, green: green, blue: blue)
 	}
-	
 }
 
 extension JVEmbedded.Color.HSB {
 	
-	// HSB Color transition (color fade effect)
-	public mutating func fade(atSpeed speed: Float = 100.0,
-							  withinRanges ranges: JVEmbedded.Color.HSB.hsbRanges) {
+	public static func random(in ranges: hsbRanges =
+							(hue: -360...360, saturation: -100...100, brightness: -100...100) ) -> JVEmbedded.Color.HSB {
 		
-		// Make sure everything has a valid range
-		self.clamped(to: ranges)
-		let clampedSpeed = speed.clamped(to: 0.0...100.0)
+		// Apply random deltas
+		let hue = Float.random(in: ranges.hue)
+		let saturation = Float.random(in: ranges.saturation)
+		let brightness = Float.random(in: ranges.brightness)
 		
-		// Convert speed into a scaling factor (percentage)
-		let speedFactor = clampedSpeed / 100.0
+		// Final clamping to enforce valid HSB ranges
+		return JVEmbedded.Color.HSB(hue: hue, saturation: saturation, brightness: brightness)
+	}
+	
+	/// Randomly adjusts HSB values within specified per-channel ranges and clamps the result.
+	public func offset(by ranges:hsbRanges =
+	(hue: -360...360, saturation: -100...100, brightness: -100...100) ) -> JVEmbedded.Color.HSB {
 		
-		// Scale the ranges down by the speed factor (keep it in Float to preserve precision)
-		let hueDeltaRange = (ranges.hue.lowerBound * speedFactor)...(ranges.hue.upperBound * speedFactor)
-		let saturationDeltaRange = (ranges.saturation.lowerBound * speedFactor)...(ranges.saturation.upperBound * speedFactor)
-		let brightnessDeltaRange = (ranges.brightness.lowerBound * speedFactor)...(ranges.brightness.upperBound * speedFactor)
+		// Apply random deltas
+		var hue = self.hue+Float.random(in: ranges.hue)
+		var saturation = self.saturation+Float.random(in: ranges.saturation)
+		var brightness = self.brightness+Float.random(in: ranges.brightness)
 		
-		// Get a random delta value for each color component from the ranges (preserve Float)
-		let hueDelta = Float.random(in: hueDeltaRange)
-		let saturationDelta = Float.random(in: saturationDeltaRange)
-		let brightnessDelta = Float.random(in: brightnessDeltaRange)
+		if hue < 0 {
+			hue += 360
+		}
+		if saturation < 0 {
+			saturation = abs(saturation)
+		}
+		if brightness < 0 {
+			brightness = abs(brightness)
+		}
 		
-		// Adjust the compononents
-		self.hue += hueDelta
-		self.saturation += saturationDelta
-		self.brightness += brightnessDelta
-		
+		return JVEmbedded.Color.HSB(hue: hue, saturation: saturation, brightness: brightness)
 	}
 	
 }

@@ -18,5 +18,13 @@ extension JVEmbedded{
 		
 	}
 
+	struct Time{
+		
+		public static func sleep(ms: Int){
+			let delay = UInt32(ms) / (1000 / UInt32(configTICK_RATE_HZ))
+			vTaskDelay(delay)
+		}
+		
+	}
 	
 }

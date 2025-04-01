@@ -155,7 +155,28 @@ extension LED{
 		//		}
 		//
 		//		init(pinNumber: Int, pixelCount: Int = 2) {
-		//			var stripConfig = led_strip_config_t(max_leds: UInt32(pixelCount), dev: 0)
+		
+		//			var rmtConfig = rmt_config_t(
+		//				rmt_mode: RMT_MODE_TX,
+		//				channel: RMT_CHANNEL_0,
+		//				gpio_num: gpio_num_t(pinNumber),
+		//				clk_div: 2, // 40 MHz clock
+		//				mem_block_num: 1,
+		//				flags: 0
+		//			)
+		//
+		//			// Apply RMT configuration
+		//			guard rmt_config(&rmtConfig) == ESP_OK else {
+		//				fatalError("⚠️ [LED.Strip.init] Failed to configure RMT")
+		//			}
+		//			guard rmt_driver_install(rmtConfig.channel, 0, 0) == ESP_OK else {
+		//				fatalError("⚠️ [LED.Strip.init] Failed to install RMT driver")
+		//			}
+		
+		//			var stripConfig = led_strip_config_t(
+		//				max_leds: UInt32(pixelCount),
+		//				dev: 0 // Assign correct RMT channel
+		//			)
 		//
 		//			// Create the LED strip instance
 		//			guard let stripHandle = led_strip_new_rmt_ws2812(&stripConfig) else {
@@ -164,7 +185,16 @@ extension LED{
 		//
 		//			self.handle = stripHandle
 		//			self.colors = Array(repeating: JVEmbedded.Color.HSB.off, count: pixelCount)
+		//
+		//			// Clear LED strip on init
+		//			if let clearFunction = cFunctionPointers.clear {
+		//				clearFunction(handle, 100)
+		//			}
 		//		}
+		//
+		//
+		//
+		//
 		//
 		//		deinit {
 		//			if let delFunction = cFunctionPointers.del {
@@ -249,7 +279,7 @@ extension LED.RGB{
 	public func flicker() {
 		
 		guard enabled else { self.color = JVEmbedded.Color.HSB.off; return}
-
+		
 		let orange = JVEmbedded.Color.HSB.orange // Corresponds to (hue:20.0, saturation: 100.0, brightness: 100.0)
 		self.color = orange
 		

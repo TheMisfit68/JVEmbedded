@@ -79,11 +79,6 @@ extension LED{
 				greenPercentage = Int(round(Double(self.rgbOutput.green) / 255.0 * 100.0))
 				bluePercentage = Int(round(Double(self.rgbOutput.blue) / 255.0 * 100.0))
 				
-				if (redPercentage == 0) && (greenPercentage == 0) && (bluePercentage == 0) {
-					redPercentage = 5
-					greenPercentage = 5
-					bluePercentage = 5
-				}
 			}
 			
 			if self.fadingEnabled {

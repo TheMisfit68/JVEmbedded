@@ -149,15 +149,36 @@ extension LED{
 		//			}
 		//		}
 		//
-		//		init(pinNumber: Int, pixelCount: Int = 2) {
 		
-		//			var rmtConfig = rmt_config_t(
-		//				rmt_mode: RMT_MODE_TX,
-		//				channel: RMT_CHANNEL_0,
-		//				gpio_num: gpio_num_t(pinNumber),
-		//				clk_div: 2, // 40 MHz clock
-		//				mem_block_num: 1,
-		//				flags: 0
+		//		init(pinNumber: UInt32, pixelCount: Int = 2) {
+		//
+		//			var testChannel = rmt_config_t(
+		//				rmt_mode : RMT_MODE_TX,
+		//				channel : channel_id,
+		//				gpio_num : pinNumber,
+		//				clk_div : 80,
+		//				mem_block_num : 1,
+		//				flags = 0,
+		//				tx_config = {
+		//					.carrier_freq_hz = 38000,
+		//					.carrier_level = RMT_CARRIER_LEVEL_HIGH,
+		//					.idle_level = RMT_IDLE_LEVEL_LOW,
+		//					.carrier_duty_percent = 33,
+		//					.carrier_en = false,
+		//					.loop_en = false,
+		//					.idle_output_en = true,
+		//				)
+		//
+		//
+		//
+		//			var channelConfig = rmt_config_t(
+		//				channel: 0,
+		//				gpio_num: pinNumber
+		//			)
+		//
+		//			var ledStripConfig = led_strip_config_t(
+		//				max_leds: pixelCount,
+		//				dev: (led_strip_dev_t)channelConfig.channel // Assign correct RMT channel,
 		//			)
 		//
 		//			// Apply RMT configuration
@@ -167,11 +188,6 @@ extension LED{
 		//			guard rmt_driver_install(rmtConfig.channel, 0, 0) == ESP_OK else {
 		//				fatalError("⚠️ [LED.Strip.init] Failed to install RMT driver")
 		//			}
-		
-		//			var stripConfig = led_strip_config_t(
-		//				max_leds: UInt32(pixelCount),
-		//				dev: 0 // Assign correct RMT channel
-		//			)
 		//
 		//			// Create the LED strip instance
 		//			guard let stripHandle = led_strip_new_rmt_ws2812(&stripConfig) else {

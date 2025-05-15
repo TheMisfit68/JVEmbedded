@@ -234,6 +234,7 @@ public final class PWMOutput: GPIO {
 			timer_sel: LEDC_TIMER_0,
 			duty: dutyCycle,
 			hpoint: 0,
+//			sleep_mode: LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,
 			flags: .init(output_invert: 0)
 		)
 		guard ledc_channel_config(&channelConfig) == ESP_OK else {

@@ -1,0 +1,72 @@
+# Provide helper functions to add individual Swift files
+# or complete modules (including shims and headers) to your application
+
+function(add_file RELATIVE_FILE_PATH)
+    set(FILE_BASE_DIR "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
+    set(FILE_PATH "${FILE_BASE_DIR}/${RELATIVE_FILE_PATH}")
+
+    if(NOT EXISTS ${FILE_PATH})
+        message(STATUS "[JVEmbedded] Skipping non-existent Swift file: ${RELATIVE_FILE_PATH}")
+        return()
+    endif()
+
+    target_sources(${COMPONENT_LIB} PRIVATE ${FILE_PATH})
+
+    get_filename_component(BASE_NAME ${FILE_PATH} NAME_WE)
+    string(TOLOWER ${BASE_NAME} BASE_NAME_LOWER)
+    get_filename_component(DIR ${FILE_PATH} DIRECTORY)
+
+    # Candidate locations for headers required for C/Swift interop
+    set(SHIM_DIR "${DIR}/shims")
+    set(INCLUDE_DIR "${DIR}/include")
+
+    set(POSSIBLE_HEADERS
+        "${SHIM_DIR}/${BASE_NAME_LOWER}_shim.h"
+        "${DIR}/${BASE_NAME}.h"
+        "${INCLUDE_DIR}/${BASE_NAME}.h"
+    )
+
+    # Location to write the partial bridging header fragment
+    set(BRIDGING_HEADER_FRAGMENT "${CMAKE_CURRENT_LIST_DIR}/JVEmbeddedAutoBridgingHeader.h")
+
+    foreach(HEADER ${POSSIBLE_HEADERS})
+        if(EXISTS ${HEADER})
+            
+            # Include the parent directory of the header to the search path
+            get_filename_component(HEADER_DIR ${HEADER} DIRECTORY)
+            target_include_directories(${COMPONENT_LIB} PRIVATE "${HEADER_DIR}")
+
+            # Append header to bridging header fragment
+			get_filename_component(HEADER_NAME "${HEADER}" NAME)
+			file(APPEND "${BRIDGING_HEADER_FRAGMENT}" "#include \"${HEADER_NAME}\"\n")
+			
+            # Add shim .cpp if present
+            set(SHIM_CPP "${SHIM_DIR}/${BASE_NAME_LOWER}_shim.cpp")
+            if(EXISTS ${SHIM_CPP})
+                message(STATUS "[JVEmbedded] Adding shim cpp: ${SHIM_CPP}")
+                target_sources(${COMPONENT_LIB} PRIVATE ${SHIM_CPP})
+            endif()
+        endif()
+    endforeach()
+endfunction()
+
+
+function(add_module RELATIVE_PATH)
+
+    set(MODULE_BASE_DIR "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
+    set(MODULE_PATH "${MODULE_BASE_DIR}/${RELATIVE_PATH}")
+
+    if(IS_DIRECTORY ${MODULE_PATH})
+        file(GLOB_RECURSE SWIFT_FILES "${MODULE_PATH}/*.swift")
+
+        foreach(SWIFT_FILE ${SWIFT_FILES})
+            # Call add_file() for each Swift file in the module using the relative path
+            file(RELATIVE_PATH REL_PATH ${MODULE_BASE_DIR} ${SWIFT_FILE})
+            add_file(${REL_PATH})
+        endforeach()
+        
+    else()
+        message(WARNING "Module path ${MODULE_PATH} does not exist or is not a directory.")
+    endif()
+    
+endfunction()

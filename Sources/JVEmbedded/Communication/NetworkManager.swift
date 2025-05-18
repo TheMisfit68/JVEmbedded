@@ -5,52 +5,102 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
+enum IPEventID: Int32 {
+	case gotIP = 0
+	case lostIP = 1
+	case gotIP6 = 2
+}
 
+enum WiFiEventID: Int32 {
+	case wifiReady = 0
+	case scanDone = 1
+	case staStart = 2
+	case staStop = 3
+	case staConnected = 4
+	case staDisconnected = 5
+	case authModeChanged = 6
+}
 
 // MARK: - Event Callbacks (C-compatible, global scope)
-
-@_cdecl("wifi_event_cb")
-func wifi_event_cb(arg: UnsafeMutableRawPointer?, base: esp_event_base_t?, id: Int32, data: UnsafeMutableRawPointer?) {
-	guard let base = base else { return }
+@_cdecl("handle_ip_event")
+func handle_ip_event(eventData: UnsafeMutableRawPointer?, eventID: Int32) {
+	guard let eventID = IPEventID(rawValue: eventID) else {
+		print("Unhandled IP event ID: \(eventID)")
+		return
+	}
 	
-	if base == WIFI_EVENT {
-		switch id {
-			case Int32(WIFI_EVENT_STA_START):
-				esp_wifi_connect()
-			case Int32(WIFI_EVENT_STA_DISCONNECTED):
-				if let manager = NetworkManager.shared {
-					if manager.retryCount < manager.maxRetryAttempts {
-						manager.retryCount += 1
-						print("🔁 Retrying Wi-Fi connection (\(manager.retryCount))")
-						esp_wifi_connect()
-					} else {
-						xEventGroupSetBits(manager.eventGroup, manager.WIFI_FAIL_BIT)
-					}
-				}
-			default:
-				break
-		}
+	switch eventID {
+		case .gotIP:
+			let event = eventData?.assumingMemoryBound(to: ip_event_got_ip_t.self).pointee
+			if let ip = event?.ip_info.ip {
+				let ipString = NetworkManager.ipToString(ip)
+				print("📡 Got IP: \(ipString)")
+			}
+			
+			// Inline signalConnected()
+			NetworkManager.shared?.retryCount = 0
+			if let group = NetworkManager.shared?.eventGroup {
+				xEventGroupSetBits(group, NetworkManager.shared!.WIFI_CONNECTED_BIT)
+			}
+			
+		case .lostIP:
+			print("Lost IP")
+			
+		case .gotIP6:
+			let event = eventData?.assumingMemoryBound(to: ip_event_got_ip6_t.self).pointee
+			if let ip6 = event?.ip6_info.ip {
+				print("Got IPv6: \(ip6)")
+			}
+			// Inline signalConnected()
+			NetworkManager.shared?.retryCount = 0
+			if let group = NetworkManager.shared?.eventGroup {
+				xEventGroupSetBits(group, NetworkManager.shared!.WIFI_CONNECTED_BIT)
+			}
 	}
 }
 
-@_cdecl("ip_event_cb")
-func ip_event_cb(arg: UnsafeMutableRawPointer?, base: esp_event_base_t?, id: Int32, data: UnsafeMutableRawPointer?) {
-	guard let base = base else { return }
+@_cdecl("handle_wifi_event")
+func handle_wifi_event(eventData: UnsafeMutableRawPointer?, eventID: Int32) {
+	guard let eventID = WiFiEventID(rawValue: eventID) else {
+		print("Unhandled Wi-Fi event ID: \(eventID)")
+		return
+	}
 	
-	if base == IP_EVENT {
-		switch id {
-			case Int32(IP_EVENT_STA_GOT_IP):
-				if let eventData = data?.assumingMemoryBound(to: ip_event_got_ip_t.self) {
-					let ip = eventData.pointee.ip_info.ip
-					let ipStr = String(cString: inet_ntoa(ip))
-					print("📡 Got IP: \(ipStr)")
-					if let manager = NetworkManager.shared {
-						xEventGroupSetBits(manager.eventGroup, manager.WIFI_CONNECTED_BIT)
+	switch eventID {
+		case .wifiReady:
+			print("Wi-Fi ready")
+			
+		case .scanDone:
+			print("Scan completed")
+			
+		case .staStart:
+			print("Connecting to AP…")
+			esp_wifi_connect()
+			
+		case .staStop:
+			print("Wi-Fi stopped")
+			
+		case .staConnected:
+			print("Wi-Fi connected")
+			
+		case .staDisconnected:
+			print("Wi-Fi disconnected")
+			if let manager = NetworkManager.shared {
+				if manager.retryCount < manager.maxRetryAttempts {
+					print("Retrying…")
+					esp_wifi_connect()
+					manager.retryCount += 1
+				} else {
+					print("Failed to connect")
+					// Inline signalFailed()
+					if let group = manager.eventGroup {
+						xEventGroupSetBits(group, manager.WIFI_FAIL_BIT)
 					}
 				}
-			default:
-				break
-		}
+			}
+			
+		case .authModeChanged:
+			print("Auth mode changed")
 	}
 }
 
@@ -65,12 +115,26 @@ final class NetworkManager:Singleton {
 	let maxRetryAttempts = 3
 	
 	// MARK: - Internal State
-	private var retryCount = 0
+	var retryCount = 0
+	var eventGroup: EventGroupHandle_t? = nil
+
 	private var netif: OpaquePointer? = nil
 	private var ipEventHandler: esp_event_handler_instance_t? = nil
 	private var wifiEventHandler: esp_event_handler_instance_t? = nil
-	private var eventGroup: EventGroupHandle_t? = nil
 	
+	
+	public static func ipToString(_ ip: esp_ip4_addr_t) -> String {
+		print("Converting IP to string gets called")
+		let addr = UInt32(bigEndian: ip.addr)
+		let octets = (
+			(addr >> 24) & 0xFF,
+			(addr >> 16) & 0xFF,
+			(addr >> 8) & 0xFF,
+			addr & 0xFF
+		)
+		return "\(octets.0).\(octets.1).\(octets.2).\(octets.3)"
+	}
+
 	// MARK: - Public API
 	/// Initializes Wi-Fi system
 	///
@@ -106,14 +170,14 @@ final class NetworkManager:Singleton {
 				return nil
 			}
 			
-			var cfg = WIFI_INIT_CONFIG_DEFAULT()
+			var cfg = get_default_wifi_init_config_shim()
 			result = esp_wifi_init(&cfg)
 			try ESPError.check(result)
 			
 			result = esp_event_handler_instance_register(
 				WIFI_EVENT,
 				ESP_EVENT_ANY_ID,
-				&wifi_event_cb,
+				wifi_event_cb_shim,
 				nil,
 				&wifiEventHandler
 			)
@@ -122,7 +186,7 @@ final class NetworkManager:Singleton {
 			result = esp_event_handler_instance_register(
 				IP_EVENT,
 				ESP_EVENT_ANY_ID,
-				&ip_event_cb,
+				ip_event_cb_shim,
 				nil,
 				&ipEventHandler
 			)
@@ -194,7 +258,7 @@ final class NetworkManager:Singleton {
 		try ESPError.check(esp_wifi_deinit())
 		
 		if let netif = netif {
-			try ESPError.check(esp_wifi_clear_default_wifi_driver_and_handlers(netif))
+			try ESPError.check(esp_wifi_clear_default_wifi_driver_and_handlers(UnsafeMutableRawPointer(netif)))
 			esp_netif_destroy(netif)
 			self.netif = nil
 		}
@@ -212,4 +276,5 @@ final class NetworkManager:Singleton {
 		
 		print("✅ NetworkManager successfully deinitialized")
 	}
+	
 }

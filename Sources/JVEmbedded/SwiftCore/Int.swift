@@ -1,4 +1,5 @@
 extension UInt8 {
+	
 	// Convert a single nibble (4 bits) to a hexadecimal character
 	func hexChar() -> Character {
 		if self < 10 {
@@ -11,5 +12,12 @@ extension UInt8 {
 			// Invalid input, return a default character (or handle error case)
 			return "?" // or some other fallback
 		}
+	}
+	
+}
+
+extension Int: JSONStringConvertible {
+	public var jsonString: String {
+		"\(self)"
 	}
 }

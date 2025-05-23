@@ -13,4 +13,11 @@ extension Swift.Bool {
 	static func ^^(lhs: Bool, rhs: Bool) -> Bool {
 		return lhs != rhs  // XOR logic: true if different, false if same
 	}
+	
+}
+
+extension Bool: JSONStringConvertible {
+	public var jsonString: String {
+		self ? "true" : "false"
+	}
 }

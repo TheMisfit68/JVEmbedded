@@ -70,3 +70,9 @@ extension Swift.String {
 	}
 	
 }
+
+extension String: JSONStringConvertible {
+	public var jsonString: String {
+		"\"\(self)\""
+	}
+}

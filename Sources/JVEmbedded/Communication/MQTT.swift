@@ -32,32 +32,39 @@ public class MQTTclient {
 		}
 	}
 	
-	public init(connectTo hostName: String,
+	public init(hostName: String,
 				port: UInt32 = 8883,
 				userName: String,
 				password: String,
 				clientId: String = "ESP32client") throws(MQTTclientError) {
+
 		
 		// Hold strong references to null-terminated UTF8 C strings
 		let cHostName = strdup(hostName)
 		let cUserName = strdup(userName)
 		let cPassword = strdup(password)
 		let cClientId = strdup(clientId)
-		var config = make_mqtt_config(cHostName, port, cClientId, cUserName, cPassword)
 		
-		let clientHandle = esp_mqtt_client_init(&config)
+		var config = make_mqtt_config(cHostName, port, cClientId, cUserName, cPassword)
+		self.clientHandle = esp_mqtt_client_init(&config)
+		
+#if DEBUG
+		print ("✅ MQTT client initialized")
+#endif
+	}
+	
+	public func connect() throws(MQTTclientError) {
+		
 		guard clientHandle != nil else {
 			throw MQTTclientError.operationFailed(code: ESP_FAIL)
 		}
-		print ("✅ MQTT client initialized")
-
 		let startResult = esp_mqtt_client_start(clientHandle)
 		guard startResult == ESP_OK else {
 			throw MQTTclientError.operationFailed(code: startResult)
 		}
+#if DEBUG
 		print ("✅ MQTT client started")
-		
-		self.clientHandle = clientHandle
+#endif
 	}
 	
 	

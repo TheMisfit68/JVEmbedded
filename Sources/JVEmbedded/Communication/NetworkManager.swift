@@ -5,6 +5,7 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
+// MARK: - Event Callbacks (C-compatible, global scope)
 enum IPEventID: Int32 {
 	case gotIP = 0
 	case lostIP = 1
@@ -19,9 +20,9 @@ enum WiFiEventID: Int32 {
 	case staConnected = 4
 	case staDisconnected = 5
 	case authModeChanged = 6
+	case staBeaconTimeout = 43  // 👈 Add this
 }
 
-// MARK: - Event Callbacks (C-compatible, global scope)
 @_cdecl("handle_ip_event")
 func handle_ip_event(eventData: UnsafeMutableRawPointer?, eventID: Int32) {
 	guard let eventID = IPEventID(rawValue: eventID) else {
@@ -101,9 +102,42 @@ func handle_wifi_event(eventData: UnsafeMutableRawPointer?, eventID: Int32) {
 			
 		case .authModeChanged:
 			print("Auth mode changed")
+		case .staBeaconTimeout:
+			print("⚠️ Beacon timeout – AP not responding")
 	}
 }
 
+public enum NetworkError: Error, ESPErrorProtocol {
+	case ok
+	case wifiNotInit
+	case wifiNotStarted
+	case wifiTimeout
+	case unknown
+	
+	public init(code: esp_err_t) {
+		switch code {
+			case ESP_OK:
+				self = .ok
+			case ESP_ERR_WIFI_NOT_INIT:
+				self = .wifiNotInit
+			case ESP_ERR_WIFI_NOT_STARTED:
+				self = .wifiNotStarted
+			case ESP_ERR_WIFI_TIMEOUT:
+				self = .wifiTimeout
+			default:
+				self = .unknown
+		}
+	}
+}
+
+// MARK: - Wi-Fi Credentials
+struct WiFiCredentials {
+	let ssid: String
+	let username: String
+	let password: String
+}
+
+// MARK: - NetworkManager
 final class NetworkManager:Singleton {
 	
 	public static let shared:NetworkManager? = NetworkManager()
@@ -119,10 +153,9 @@ final class NetworkManager:Singleton {
 	var eventGroup: EventGroupHandle_t? = nil
 
 	private var netif: OpaquePointer? = nil
-	private var ipEventHandler: esp_event_handler_instance_t? = nil
-	private var wifiEventHandler: esp_event_handler_instance_t? = nil
-	
-	
+	private static var wifiEventHandler: esp_event_handler_instance_t? = nil
+	private static var ipEventHandler: esp_event_handler_instance_t? = nil
+
 	public static func ipToString(_ ip: esp_ip4_addr_t) -> String {
 		print("Converting IP to string gets called")
 		let addr = UInt32(bigEndian: ip.addr)
@@ -134,14 +167,80 @@ final class NetworkManager:Singleton {
 		)
 		return "\(octets.0).\(octets.1).\(octets.2).\(octets.3)"
 	}
+	
+	private static func ensureEventHandlersRegistered() throws(NetworkError) {
+		if !eventsRegistered {
+			try registerForEvents()
+		}
+	}
+	private static var eventsRegistered = false
+	
+	public static func registerForEvents() throws(NetworkError) {
+		
+		// Initialize the default event loop if not yet created
+		let result = esp_event_loop_create_default()
+		try NetworkError.check(result, "❌ Could not create event loop")
+		
+		try NetworkError.check(esp_event_handler_instance_register(
+			WIFI_EVENT,
+			ESP_EVENT_ANY_ID,
+			wifi_event_cb_shim,
+			nil,
+			&wifiEventHandler
+		), "❌ Wifi event handler registration failed")
+		
+		try NetworkError.check(esp_event_handler_instance_register(
+			IP_EVENT,
+			ESP_EVENT_ANY_ID,
+			ip_event_cb_shim,
+			nil,
+			&ipEventHandler
+		), "❌ IP event handler registration failed")
+		
+		eventsRegistered = true
+		print("✅ NetworkManager: Wi-Fi and IP event handlers registered")
+	}
+	
+//	public static func getWiFiCredentials() throws(NetworkError) -> WiFiCredentials {
+//		var handle: nvs_handle_t = 0
+//		
+//		// 1. Open NVS handle
+//		let openResult = nvs_open_from_partition("nvs", "storage", NVS_READWRITE, &handle)
+//		guard openResult == ESP_OK else {
+//			led_strip_set_pixel(led_strip, 0, 25, 0, 0)
+//			led_strip_refresh(led_strip)
+//			throw WiFiCredentialError.openFailed(ESPError(code: openResult))
+//		}
+//		
+//		// 2. Read SSID
+//		let ssid = try withUnsafeTemporaryAllocation(of: CChar.self, capacity: 32) { ssidBuffer -> String in
+//			var ssidLen: Int = 32
+//			let err = nvs_get_str(handle, "ssid", ssidBuffer.baseAddress, &ssidLen)
+//			guard err == ESP_OK else {
+//				throw WiFiCredentialError.readSSIDFailed(ESPError(code: err))
+//			}
+//			return String(cString: ssidBuffer.baseAddress!)
+//		}
+//		
+//		// 3. Read Password
+//		let password = try withUnsafeTemporaryAllocation(of: CChar.self, capacity: 64) { passBuffer -> String in
+//			var passLen: Int = 64
+//			let err = nvs_get_str(handle, "password", passBuffer.baseAddress, &passLen)
+//			guard err == ESP_OK else {
+//				throw WiFiCredentialError.readPasswordFailed(ESPError(code: err))
+//			}
+//			return String(cString: passBuffer.baseAddress!)
+//		}
+//		
+//		nvs_close(handle)
+//		
+//		return WiFiCredentials(ssid: ssid, password: password)
+//	}
+	
+	public init?() {
+		
+		var result: esp_err_t
 
-	// MARK: - Public API
-	/// Initializes Wi-Fi system
-	///
-	init?(){
-		
-		var result:esp_err_t
-		
 		do {
 			
 			result = nvs_flash_init()
@@ -149,6 +248,7 @@ final class NetworkManager:Singleton {
 				_ = nvs_flash_erase()
 				result = nvs_flash_init()
 			}
+			try NetworkError.check(result)
 			
 			eventGroup = xEventGroupCreate()
 			guard eventGroup != nil else {
@@ -156,49 +256,33 @@ final class NetworkManager:Singleton {
 				return nil
 			}
 			
-			try ESPError.check(esp_netif_init())
+			try NetworkError.check(esp_netif_init())
 			
-			result = esp_event_loop_create_default()
-			try ESPError.check(result)
+//			result = esp_event_loop_create_default()
+//			try NetworkError.check(result)
 			
 			result = esp_wifi_set_default_wifi_sta_handlers()
-			try ESPError.check(result)
+			try NetworkError.check(result)
 			
 			netif = esp_netif_create_default_wifi_sta()
-			if netif == nil {
+			guard netif != nil else {
 				print("❌ Error: Failed to create default Wi-Fi STA interface")
 				return nil
 			}
 			
 			var cfg = get_default_wifi_init_config_shim()
 			result = esp_wifi_init(&cfg)
-			try ESPError.check(result)
+			try NetworkError.check(result)
 			
-			result = esp_event_handler_instance_register(
-				WIFI_EVENT,
-				ESP_EVENT_ANY_ID,
-				wifi_event_cb_shim,
-				nil,
-				&wifiEventHandler
-			)
-			try ESPError.check(result)
-			
-			result = esp_event_handler_instance_register(
-				IP_EVENT,
-				ESP_EVENT_ANY_ID,
-				ip_event_cb_shim,
-				nil,
-				&ipEventHandler
-			)
-			try ESPError.check(result)
+			try Self.ensureEventHandlersRegistered()
 			
 		} catch {
+			print("❌ NetworkManager init failed with error: \(error)")
 			return nil
 		}
-		
 	}
 	
-	public func connect(ssid: String, password: String) throws(ESPError) {
+	public func connect(ssid: String, password: String) throws(NetworkError) {
 		
 		var wifiConfig = wifi_config_t()
 		wifiConfig.sta.threshold.authmode = WIFI_AUTHMODE
@@ -213,11 +297,11 @@ final class NetworkManager:Singleton {
 		strncpy(&wifiConfig.sta.ssid.0, cSSID, MemoryLayout.size(ofValue: wifiConfig.sta.ssid))
 		strncpy(&wifiConfig.sta.password.0, cPassword, MemoryLayout.size(ofValue: wifiConfig.sta.password))
 		
-		try ESPError.check(esp_wifi_set_ps(WIFI_PS_NONE))
-		try ESPError.check(esp_wifi_set_storage(WIFI_STORAGE_RAM))
-		try ESPError.check(esp_wifi_set_mode(WIFI_MODE_STA))
-		try ESPError.check(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig))
-		try ESPError.check(esp_wifi_start())
+		try NetworkError.check(esp_wifi_set_ps(WIFI_PS_NONE))
+		try NetworkError.check(esp_wifi_set_storage(WIFI_STORAGE_RAM))
+		try NetworkError.check(esp_wifi_set_mode(WIFI_MODE_STA))
+		try NetworkError.check(esp_wifi_set_config(WIFI_IF_STA, &wifiConfig))
+		try NetworkError.check(esp_wifi_start())
 		
 		let bits = xEventGroupWaitBits(
 			eventGroup,
@@ -230,51 +314,54 @@ final class NetworkManager:Singleton {
 		if (bits & WIFI_CONNECTED_BIT) != 0 {
 			print("✅ Connected to Wi-Fi network: \(ssid)")
 		} else if (bits & WIFI_FAIL_BIT) != 0 {
-			throw ESPError.wifi(.notStarted)
+			throw NetworkError.wifiNotStarted
 		} else {
-			throw ESPError.wifi(.notStarted)
+			throw NetworkError.wifiNotStarted
 		}
 	}
 	
-	public func disconnect() throws(ESPError) {
+	public func disconnect() throws(NetworkError) {
 		if let group = eventGroup {
 			vEventGroupDelete(group)
 			eventGroup = nil
 		}
 		
 		let result = esp_wifi_disconnect()
-		try ESPError.check(result)
+		try NetworkError.check(result)
 	}
 	
-	public func deinitialize() throws(ESPError) {
+	public func deinitialize() throws(NetworkError) {
 		
 		var result = esp_wifi_stop()
 		if result == ESP_ERR_WIFI_NOT_INIT {
-			try ESPError.check(result)
+			try NetworkError.check(result)
 		} else {
-			try ESPError.check(result)
+			try NetworkError.check(result)
 		}
 		
-		try ESPError.check(esp_wifi_deinit())
+		try NetworkError.check(esp_wifi_deinit())
 		
 		if let netif = netif {
-			try ESPError.check(esp_wifi_clear_default_wifi_driver_and_handlers(UnsafeMutableRawPointer(netif)))
+			try NetworkError.check(esp_wifi_clear_default_wifi_driver_and_handlers(UnsafeMutableRawPointer(netif)))
 			esp_netif_destroy(netif)
 			self.netif = nil
 		}
 		
-		if let ipHandler = ipEventHandler {
-			try ESPError.check(esp_event_handler_instance_unregister(IP_EVENT, ESP_EVENT_ANY_ID, ipHandler))
-			ipEventHandler = nil
+		if let ipHandler = Self.ipEventHandler {
+			try NetworkError.check(esp_event_handler_instance_unregister(IP_EVENT, ESP_EVENT_ANY_ID, ipHandler))
+			Self.ipEventHandler = nil
 		}
 		
-		if let wifiHandler = wifiEventHandler {
-			try ESPError.check(
+		if let wifiHandler = Self.wifiEventHandler {
+			try NetworkError.check(
 				esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifiHandler))
-			wifiEventHandler = nil
+			Self.wifiEventHandler = nil
 		}
 		
 		print("✅ NetworkManager successfully deinitialized")
 	}
-	
 }
+
+
+
+

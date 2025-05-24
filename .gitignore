@@ -11,3 +11,8 @@ PrivateToDo.md
 .swiftpm
 .vscode
 .xcuserstate
+
+# Ignore patterns
+*private*
+*Private*
+*PRIVATE*

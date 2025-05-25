@@ -107,35 +107,6 @@ func handle_wifi_event(eventData: UnsafeMutableRawPointer?, eventID: Int32) {
 	}
 }
 
-public enum NetworkError: Error, ESPErrorProtocol {
-	case ok
-	case wifiNotInit
-	case wifiNotStarted
-	case wifiTimeout
-	case unknown
-	
-	public init(code: esp_err_t) {
-		switch code {
-			case ESP_OK:
-				self = .ok
-			case ESP_ERR_WIFI_NOT_INIT:
-				self = .wifiNotInit
-			case ESP_ERR_WIFI_NOT_STARTED:
-				self = .wifiNotStarted
-			case ESP_ERR_WIFI_TIMEOUT:
-				self = .wifiTimeout
-			default:
-				self = .unknown
-		}
-	}
-}
-
-// MARK: - Wi-Fi Credentials
-struct WiFiCredentials {
-	let ssid: String
-	let username: String
-	let password: String
-}
 
 // MARK: - NetworkManager
 final class NetworkManager:Singleton {
@@ -201,42 +172,6 @@ final class NetworkManager:Singleton {
 		print("✅ NetworkManager: Wi-Fi and IP event handlers registered")
 	}
 	
-//	public static func getWiFiCredentials() throws(NetworkError) -> WiFiCredentials {
-//		var handle: nvs_handle_t = 0
-//		
-//		// 1. Open NVS handle
-//		let openResult = nvs_open_from_partition("nvs", "storage", NVS_READWRITE, &handle)
-//		guard openResult == ESP_OK else {
-//			led_strip_set_pixel(led_strip, 0, 25, 0, 0)
-//			led_strip_refresh(led_strip)
-//			throw WiFiCredentialError.openFailed(ESPError(code: openResult))
-//		}
-//		
-//		// 2. Read SSID
-//		let ssid = try withUnsafeTemporaryAllocation(of: CChar.self, capacity: 32) { ssidBuffer -> String in
-//			var ssidLen: Int = 32
-//			let err = nvs_get_str(handle, "ssid", ssidBuffer.baseAddress, &ssidLen)
-//			guard err == ESP_OK else {
-//				throw WiFiCredentialError.readSSIDFailed(ESPError(code: err))
-//			}
-//			return String(cString: ssidBuffer.baseAddress!)
-//		}
-//		
-//		// 3. Read Password
-//		let password = try withUnsafeTemporaryAllocation(of: CChar.self, capacity: 64) { passBuffer -> String in
-//			var passLen: Int = 64
-//			let err = nvs_get_str(handle, "password", passBuffer.baseAddress, &passLen)
-//			guard err == ESP_OK else {
-//				throw WiFiCredentialError.readPasswordFailed(ESPError(code: err))
-//			}
-//			return String(cString: passBuffer.baseAddress!)
-//		}
-//		
-//		nvs_close(handle)
-//		
-//		return WiFiCredentials(ssid: ssid, password: password)
-//	}
-	
 	public init?() {
 		
 		var result: esp_err_t
@@ -258,8 +193,8 @@ final class NetworkManager:Singleton {
 			
 			try NetworkError.check(esp_netif_init())
 			
-//			result = esp_event_loop_create_default()
-//			try NetworkError.check(result)
+			result = esp_event_loop_create_default()
+			try NetworkError.check(result)
 			
 			result = esp_wifi_set_default_wifi_sta_handlers()
 			try NetworkError.check(result)

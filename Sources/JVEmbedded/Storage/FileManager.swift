@@ -23,11 +23,11 @@ public class FileManager {
 		self.partitionLabel = partitionLabel
 		
 		try? self.mountPartition()
-		
+		nvs_flash_init() // Also lways initialize/enable te default NVS partition for key-value storage.
 	}
 	
-	// Sets the NVS partition to use for easy Key-Value storage.
-	public func setNVSPartition(_ partitionName: String) throws(StorageError) {
+	// Enable custum NVS partition to use for easy Key-Value storage.
+	public func setcustomNVSPartition(_ partitionName: String) throws(StorageError) {
 		var error = ESP_OK
 		partitionName.withCString { partitionNameCStr in
 			error = nvs_flash_init_partition(partitionNameCStr)

@@ -5,39 +5,29 @@
 //  Created by Jan Verrept on 02/05/2025.
 //
 
-public enum MQTTclientError: Error {
-	case operationFailed(code: esp_err_t)
-}
-
 public class MQTTclient {
 	
 	private var clientHandle: OpaquePointer?
 	
-	static func installGlobalCAstore(rootCAcertificate: String) throws(MQTTclientError) {
-		
+	static func installGlobalCAstore(rootCAcertificate: String) throws(MQTTerror) {
 		var caCertBytes = Array(rootCAcertificate.utf8)
 		caCertBytes.append(0) // Manually null-terminate
 		
-		let initResult = esp_tls_init_global_ca_store()
-		guard initResult == ESP_OK else {
-			throw MQTTclientError.operationFailed(code: initResult)
-		}
+		try MQTTerror.check(esp_tls_init_global_ca_store())
 		
 		let setResult = caCertBytes.withUnsafeBufferPointer { buffer in
 			esp_tls_set_global_ca_store(buffer.baseAddress, UInt32(buffer.count))
 		}
 		
-		if setResult != ESP_OK {
-			throw MQTTclientError.operationFailed(code: setResult)
-		}
+		try MQTTerror.check(setResult)
 	}
 	
 	public init(hostName: String,
 				port: UInt32 = 8883,
 				userName: String,
 				password: String,
-				clientId: String = "ESP32client") throws(MQTTclientError) {
-
+				clientId: String = "ESP32client") throws(MQTTerror) {
+		
 		
 		// Hold strong references to null-terminated UTF8 C strings
 		let cHostName = strdup(hostName)
@@ -53,14 +43,14 @@ public class MQTTclient {
 #endif
 	}
 	
-	public func connect() throws(MQTTclientError) {
+	public func connect() throws(MQTTerror) {
 		
 		guard clientHandle != nil else {
-			throw MQTTclientError.operationFailed(code: ESP_FAIL)
+			throw MQTTerror.operationFailed
 		}
 		let startResult = esp_mqtt_client_start(clientHandle)
 		guard startResult == ESP_OK else {
-			throw MQTTclientError.operationFailed(code: startResult)
+			throw MQTTerror.operationFailed
 		}
 #if DEBUG
 		print ("✅ MQTT client started")
@@ -68,10 +58,10 @@ public class MQTTclient {
 	}
 	
 	
-	public func publish(topic: String, message: String, qos: Int32 = 1, retain: Int32 = 0) throws(MQTTclientError) {
+	public func publish(topic: String, message: String, qos: Int32 = 1, retain: Int32 = 0) throws(MQTTerror) {
 		
 		guard let clientHandle = self.clientHandle else {
-			throw MQTTclientError.operationFailed(code: ESP_FAIL)
+			throw MQTTerror.operationFailed
 		}
 		
 		let result = topic.withCString { topicCString in
@@ -82,13 +72,13 @@ public class MQTTclient {
 		}
 		
 		if result < 0 {
-			throw MQTTclientError.operationFailed(code: result)
+			throw MQTTerror.operationFailed
 		}
 	}
 	
-	public func subscribe(topic: String, qos: Int32 = 1) throws(MQTTclientError) {
+	public func subscribe(topic: String, qos: Int32 = 1) throws(MQTTerror) {
 		guard let clientHandle = self.clientHandle else {
-			throw MQTTclientError.operationFailed(code: ESP_FAIL)
+			throw MQTTerror.operationFailed
 		}
 		
 		let result = topic.withCString { topicCString in
@@ -96,13 +86,13 @@ public class MQTTclient {
 		}
 		
 		if result < 0 {
-			throw MQTTclientError.operationFailed(code: result)
+			throw MQTTerror.operationFailed
 		}
 	}
 	
-	public func unsubscribe(topic: String) throws(MQTTclientError) {
+	public func unsubscribe(topic: String) throws(MQTTerror) {
 		guard let clientHandle = self.clientHandle else {
-			throw MQTTclientError.operationFailed(code: ESP_FAIL)
+			throw MQTTerror.operationFailed
 		}
 		
 		let result = topic.withCString { topicCString in
@@ -110,7 +100,7 @@ public class MQTTclient {
 		}
 		
 		if result < 0 {
-			throw MQTTclientError.operationFailed(code: result)
+			throw MQTTerror.operationFailed
 		}
 	}
 	

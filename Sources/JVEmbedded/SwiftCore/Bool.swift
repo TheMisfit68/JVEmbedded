@@ -15,9 +15,3 @@ extension Swift.Bool {
 	}
 	
 }
-
-extension Bool: JSONStringConvertible {
-	public var jsonString: String {
-		self ? "true" : "false"
-	}
-}

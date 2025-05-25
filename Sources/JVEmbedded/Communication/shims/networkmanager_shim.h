@@ -1,5 +1,4 @@
 // wifi_event_shims.h
-
 #pragma once
 
 #include "esp_log.h"

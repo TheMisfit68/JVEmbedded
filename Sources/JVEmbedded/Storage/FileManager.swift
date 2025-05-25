@@ -5,73 +5,78 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
+// A simple file manager
+// capable of mounting SPIFFS partitions and reading and writing files from it,
+// as well as reading and writing key-value pairs using stand nvs partitions.
+
 public class FileManager {
 	
 	public static let shared = FileManager()
 	
-	private let basePath: String
+	private let partitionName: String
 	private let partitionLabel: String?
 	
-	private init(basePath: String = "/Storage", partitionLabel: String? = nil) {
-		self.basePath = basePath
+	public init(partitionName: String = "/Storage", partitionLabel: String? = nil) {
+		
+		// Initialize a SPIFFS partition for file storage
+		self.partitionName = partitionName
 		self.partitionLabel = partitionLabel
 		
-		self.mountPartition()
+		try? self.mountPartition()
+		
 	}
 	
-	/// Mount the SPIFFS partition
-	@discardableResult
-	public func mountPartition() -> Bool {
-		var mounted = false
-		basePath.withCString { basePathCStr in
+	// Sets the NVS partition to use for easy Key-Value storage.
+	public func setNVSPartition(_ partitionName: String) throws(StorageError) {
+		var error = ESP_OK
+		partitionName.withCString { partitionNameCStr in
+			error = nvs_flash_init_partition(partitionNameCStr)
+		}
+		try? StorageError.check(error)
+	}
+	
+	public func mountPartition() throws(StorageError) {
+		var conf:esp_vfs_spiffs_conf_t = esp_vfs_spiffs_conf_t()
+
+		partitionName.withCString { partitionNameCStr in
+			
 			if let partitionLabel = self.partitionLabel {
+				
 				partitionLabel.withCString { labelCStr in
-					var conf = esp_vfs_spiffs_conf_t(
-						base_path: basePathCStr,
+					conf = esp_vfs_spiffs_conf_t(
+						base_path: partitionNameCStr,
 						partition_label: labelCStr,
 						max_files: 5,
 						format_if_mount_failed: false
 					)
-					let result = esp_vfs_spiffs_register(&conf)
-					mounted = (result == ESP_OK)
-					if mounted {
-						print("✅ 🚀 [FileManager] Successfully mounted SPIFFS at '\(basePath)'")
-					} else {
-						var errBuffer = [CChar](repeating: 0, count: 64)
-						let errString = esp_err_to_name_r(result, &errBuffer, errBuffer.count)
-						print("❌ [FileManager] Failed to mount SPIFFS: \(String(cString: errString!)) ❗️")
-					}
+					
 				}
 			} else {
-				var conf = esp_vfs_spiffs_conf_t(
-					base_path: basePathCStr,
+				conf = esp_vfs_spiffs_conf_t(
+					base_path: partitionNameCStr,
 					partition_label: nil,
 					max_files: 5,
 					format_if_mount_failed: false
 				)
-				let result = esp_vfs_spiffs_register(&conf)
-				mounted = (result == ESP_OK)
-				if mounted {
-					print("✅ 🚀 [FileManager] Successfully mounted SPIFFS at '\(basePath)'")
-				} else {
-					var errBuffer = [CChar](repeating: 0, count: 64)
-					let errString = esp_err_to_name_r(result, &errBuffer, errBuffer.count)
-					print("❌ [FileManager] Failed to mount SPIFFS: \(String(cString: errString!)) ❗️")
-				}
 			}
 		}
-		return mounted
+		
+		try StorageError.check(esp_vfs_spiffs_register(&conf))
+		
+#if DEBUG
+		print("✅ 🚀 [FileManager] Successfully mounted SPIFFS partition '\(partitionName)'")
+#endif
 	}
 	
 	public func readFile(named fileName: String) -> String? {
 		
 		// Compose full path in Swift
-		let fullPath = "\(basePath)/\(fileName)"
+		let fullPath = "/\(fileName)"
 		
 		return fullPath.withCString { fullPathCStr in
 			// Open the file using the C string
 			guard let file = fopen(fullPathCStr, "r") else {
-				print("❌ 📂 [FileManager] Failed to open file: '\(fileName)'")
+				print("❌ 📂 [FileManager] Failed to open file at: '\(fullPath)'")
 				return nil
 			}
 			defer { fclose(file) }
@@ -84,7 +89,7 @@ public class FileManager {
 				result += String(cString: buffer)
 			}
 #if debug
-			print("✅ 📄 [FileManager] Successfully read file: '\(fileName)'")
+			print("✅ 📄 [FileManager] Successfully read file at: '\(fullPath)'")
 #endif
 			return result
 		}
@@ -113,5 +118,28 @@ public class FileManager {
 			}
 		}
 #endif
+	}
+}
+
+
+// MARK: - NVS Storage,
+// reading and writing keys and values from a defined namespace
+extension FileManager {
+	
+	public func readNVS<T: NVSStorable>(partition:String = "nvs", key: String, namespace: String = "storage") throws(StorageError) -> T {
+		var handle: nvs_handle_t = 0
+		try StorageError.check(nvs_open_from_partition(partition, namespace, NVS_READONLY, &handle), "Opening NVS namespace \(namespace) failed")
+		defer { nvs_close(handle) }
+		
+		return try T.read(from: handle, key: key)
+	}
+	
+	public func writeNVS<T: NVSStorable>(_ value: T, partition:String = "nvs", key: String, namespace: String = "storage") throws(StorageError) {
+		var handle: nvs_handle_t = 0
+		try StorageError.check(nvs_open_from_partition(partition, namespace, NVS_READWRITE, &handle), "Opening NVS namespace \(namespace) failed")
+		defer { nvs_close(handle) }
+		
+		try value.write(to: handle, key: key)
+		try StorageError.check(nvs_commit(handle), "Committing to NVS failed")
 	}
 }

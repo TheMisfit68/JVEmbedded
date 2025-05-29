@@ -39,7 +39,7 @@ extension Double: JSONStringConvertible {
 		
 		let sign = isNegative ? "-" : ""
 		let finalString = sign + "\(integerPart).\(fracStr)"
-		return "\"\(finalString)\""
+		return "\(finalString)"
 	}
 	
 }

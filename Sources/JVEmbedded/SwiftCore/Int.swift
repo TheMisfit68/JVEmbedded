@@ -15,10 +15,3 @@ extension UInt8 {
 	}
 	
 }
-
-extension Int: JSONStringConvertible {
-	public var jsonString: String {
-		"\(self)"
-	}
-}
-

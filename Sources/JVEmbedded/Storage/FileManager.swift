@@ -7,7 +7,6 @@
 
 // A simple file manager
 // capable of mounting SPIFFS partitions and reading and writing files from it,
-// as well as reading and writing key-value pairs using stand nvs partitions.
 
 public class FileManager {
 	
@@ -24,15 +23,6 @@ public class FileManager {
 		
 		try? self.mountPartition()
 		nvs_flash_init() // Also lways initialize/enable te default NVS partition for key-value storage.
-	}
-	
-	// Enable custum NVS partition to use for easy Key-Value storage.
-	public func setcustomNVSPartition(_ partitionName: String) throws(StorageError) {
-		var error = ESP_OK
-		partitionName.withCString { partitionNameCStr in
-			error = nvs_flash_init_partition(partitionNameCStr)
-		}
-		try? StorageError.check(error)
 	}
 	
 	public func mountPartition() throws(StorageError) {
@@ -118,28 +108,5 @@ public class FileManager {
 			}
 		}
 #endif
-	}
-}
-
-
-// MARK: - NVS Storage,
-// reading and writing keys and values from a defined namespace
-extension FileManager {
-	
-	public func readNVS<T: NVSStorable>(partition:String = "nvs", key: String, namespace: String = "storage") throws(StorageError) -> T {
-		var handle: nvs_handle_t = 0
-		try StorageError.check(nvs_open_from_partition(partition, namespace, NVS_READONLY, &handle), "Opening NVS namespace \(namespace) failed")
-		defer { nvs_close(handle) }
-		
-		return try T.read(from: handle, key: key)
-	}
-	
-	public func writeNVS<T: NVSStorable>(_ value: T, partition:String = "nvs", key: String, namespace: String = "storage") throws(StorageError) {
-		var handle: nvs_handle_t = 0
-		try StorageError.check(nvs_open_from_partition(partition, namespace, NVS_READWRITE, &handle), "Opening NVS namespace \(namespace) failed")
-		defer { nvs_close(handle) }
-		
-		try value.write(to: handle, key: key)
-		try StorageError.check(nvs_commit(handle), "Committing to NVS failed")
 	}
 }

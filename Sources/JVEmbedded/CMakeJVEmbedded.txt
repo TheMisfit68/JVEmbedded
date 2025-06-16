@@ -1,5 +1,51 @@
+# Derive the Swift 'architecture triple' from the ESP-IDF target
+if(NOT DEFINED IDF_TARGET)
+    set(IDF_TARGET "${target}")
+	message(STATUS "📌 IDF_TARGET was not defined — using fallback value: ${target}")
+endif()
+
+if(IDF_TARGET STREQUAL "esp32" OR IDF_TARGET STREQUAL "esp32c3" OR IDF_TARGET STREQUAL "esp32c6")
+    set(SWIFT_EMBEDDED_TRIPLE "riscv32-none-none-eabi")
+elseif(IDF_TARGET STREQUAL "esp32s3")
+    set(SWIFT_EMBEDDED_TRIPLE "xtensa-esp32s3-elf")
+elseif(IDF_TARGET STREQUAL "esp32s2")
+    set(SWIFT_EMBEDDED_TRIPLE "xtensa-esp32s2-elf")
+elseif(IDF_TARGET STREQUAL "esp32h2")
+    set(SWIFT_EMBEDDED_TRIPLE "riscv32-none-none-eabi") # H2 is also RISC-V
+else()
+    message(FATAL_ERROR "Unknown ESP-IDF target '${IDF_TARGET}', unable to determine Swift Embedded triple.")
+endif()
+
+# Easily add advanced String support to your project
+function(advancedStringSupport ENABLED)
+    if(${ENABLED})
+    
+        # Derive the full toolchain library path from the compiler location
+        get_filename_component(SWIFT_TOOLCHAIN_DIR "${CMAKE_Swift_COMPILER}" DIRECTORY)
+        set(SWIFT_EMBEDDED_LIB "${SWIFT_TOOLCHAIN_DIR}/../lib/swift/embedded/${SWIFT_EMBEDDED_TRIPLE}")
+
+        # Validate existence of the Unicode data tables
+        if(NOT EXISTS "${SWIFT_EMBEDDED_LIB}/libswiftUnicodeDataTables.a")
+            message(FATAL_ERROR "❌ Unicode data table not found at: ${SWIFT_EMBEDDED_LIB}/libswiftUnicodeDataTables.a")
+        endif()
+
+        # Link the Unicode support archive explicitly
+        target_link_libraries(${COMPONENT_LIB}
+            "-Wl,--whole-archive"
+            "${SWIFT_EMBEDDED_LIB}/libswiftUnicodeDataTables.a"
+            "-Wl,--no-whole-archive"
+        )
+
+        message(STATUS "✅ Unicode string support enabled and linked for architecture triple ${SWIFT_EMBEDDED_TRIPLE}.")
+    else()
+        message(STATUS "ℹ️ Unicode string support disabled.")
+    endif()
+endfunction()
+
+
 # Provide helper functions to add individual Swift files
 # or complete modules (including shims and headers) to your application
+# To be replaced by proper CMake components in the future!!
 
 function(add_file RELATIVE_FILE_PATH)
     set(FILE_BASE_DIR "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")

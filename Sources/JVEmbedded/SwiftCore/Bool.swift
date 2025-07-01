@@ -15,3 +15,29 @@ extension Swift.Bool {
 	}
 	
 }
+
+#if hasFeature(Embedded)
+
+extension Swift.Bool:LosslessStringConvertible{
+	
+	public init?(_ stringValue: String) {
+		
+		switch stringValue.lowercased() {
+			case "true", "1":
+				self = true
+			case "false", "0":
+				self = false
+			default:
+				return nil  // Invalid string representation
+		}
+	}
+	
+	public var description: String {
+		return self ? "true" : "false"
+	}
+	
+}
+
+#endif
+
+

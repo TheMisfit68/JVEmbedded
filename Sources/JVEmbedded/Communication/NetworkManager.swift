@@ -150,8 +150,14 @@ final class NetworkManager:Singleton {
 		
 		// Initialize the default event loop if not yet created
 		let result = esp_event_loop_create_default()
-		try NetworkError.check(result, "❌ Could not create event loop")
-		
+		switch result {
+			case ESP_OK:
+				print("✅ Event loop created.")
+			case ESP_ERR_INVALID_STATE:
+				print("ℹ️ Event loop already exists")
+			default:
+				try NetworkError.check(result, "❌ Failed to create event loop")
+		}
 		try NetworkError.check(esp_event_handler_instance_register(
 			WIFI_EVENT,
 			ESP_EVENT_ANY_ID,
@@ -194,7 +200,14 @@ final class NetworkManager:Singleton {
 			try NetworkError.check(esp_netif_init())
 			
 			result = esp_event_loop_create_default()
-			try NetworkError.check(result)
+			switch result {
+				case ESP_OK:
+					print("✅ Event loop created.")
+				case ESP_ERR_INVALID_STATE:
+					print("ℹ️ Event loop already exists, skipping.")
+				default:
+					try NetworkError.check(result, "❌ Failed to create event loop")
+			}
 			
 			result = esp_wifi_set_default_wifi_sta_handlers()
 			try NetworkError.check(result)
@@ -295,6 +308,7 @@ final class NetworkManager:Singleton {
 		
 		print("✅ NetworkManager successfully deinitialized")
 	}
+	
 }
 
 

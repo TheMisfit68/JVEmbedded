@@ -15,3 +15,107 @@ extension UInt8 {
 	}
 	
 }
+
+#if hasFeature(Embedded)
+
+extension Int: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension Int8: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension Int16: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension Int32: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension Int64: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension UInt: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension UInt8: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension UInt16: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension UInt32: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+extension UInt64: LosslessStringConvertible {
+	public init?(_ description: String) {
+		self.init(description, radix: 10)
+	}
+	
+	public var description: String {
+		String(self)
+	}
+}
+
+#endif

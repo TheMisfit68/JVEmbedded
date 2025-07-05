@@ -5,6 +5,10 @@
 //  Created by Jan Verrept on 01/06/2025.
 //
 
+protocol ConfigurableSettings {
+	init?()
+}
+	
 // A simple settings manager
 // capable of reading and writing key-value pairs using nvs partitions.
 
@@ -12,7 +16,13 @@ public final class SettingsManager {
 	
 	public static let shared = SettingsManager()
 	
-	// Enable custum NVS partition to use for easy Key-Value storage.
+	init() {
+		
+		// Initialize NVS Flash
+		try? StorageError.check(nvs_flash_init(), "Failed to initialize NVS Flash")
+	}
+	
+	// Enable custom NVS partition to use for easy Key-Value storage.
 	public func setcustomNVSPartition(_ partitionName: String) throws(StorageError) {
 		var error = ESP_OK
 		partitionName.withCString { partitionNameCStr in

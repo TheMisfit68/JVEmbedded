@@ -5,6 +5,10 @@
 //  Created by Jan Verrept on 01/06/2025.
 //
 
+protocol ConfigurableSettings {
+	init?()
+}
+	
 // A simple settings manager
 // capable of reading and writing key-value pairs using nvs partitions.
 

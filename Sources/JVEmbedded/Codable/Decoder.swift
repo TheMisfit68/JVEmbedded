@@ -10,9 +10,9 @@
 
 public class Decoder {
 	
-	internal let storage: [String: CodableValue]
+	internal let storage: CodableValue
 	
-	public init(storage: [String: CodableValue]) {
+	public init(storage: CodableValue) {
 		self.storage = storage
 	}
 	
@@ -22,106 +22,32 @@ public class Decoder {
 			throw DecodingError.invalidKeyPath("Malformed key path")
 		}
 		
-		var current: CodableValue = .object(storage)
+		guard case .dictionary(let rootDict) = storage else {
+			throw DecodingError.invalidFormat("Top-level value is not a dictionary")
+		}
+		var current = rootDict
+		
 		for key in keys.dropLast() {
-			guard case .object(let dict) = current,
-				  let next = dict[key] else {
+			guard let nextValue = current[key],
+				  case .dictionary(let nextDict) = nextValue else {
 				throw DecodingError.missingKey("Key path component '\(key)' not found")
 			}
-			current = next
+			current = nextDict
 		}
 		
-		guard case .object(let leafDict) = current, let leafValue = leafDict[leafKey] else {
+		guard let leafValue = current[leafKey] else {
 			throw DecodingError.missingKey("Leaf key '\(leafKey)' not found")
 		}
 		
 		return leafValue
 	}
 	
+	// MARK: - Generic Type Decoding
+	
 	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> String {
 		let value = try lookupValue(for: keyPath)
 		guard case .string(let result) = value else {
 			throw DecodingError.typeMismatch(expected: "String", found: "\(value)")
-		}
-		return result
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return result
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int8 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return Int8(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int16 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return Int16(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int32 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return Int32(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int64 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return Int64(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt8 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return UInt8(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt16 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return UInt16(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt32 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return UInt32(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt64 {
-		let value = try lookupValue(for: keyPath)
-		guard case .int(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
-		}
-		return UInt64(result)
-	}
-	
-	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Double {
-		let value = try lookupValue(for: keyPath)
-		guard case .double(let result) = value else {
-			throw DecodingError.typeMismatch(expected: "Double", found: "\(value)")
 		}
 		return result
 	}
@@ -134,55 +60,48 @@ public class Decoder {
 		return result
 	}
 	
-	// Decode value at a single key
-	final func decode(forKey key: String) throws(DecodingError) -> String {
-		return try decode(atKeyPath: key)
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Double {
+		let value = try lookupValue(for: keyPath)
+		guard case .double(let result) = value else {
+			throw DecodingError.typeMismatch(expected: "Double", found: "\(value)")
+		}
+		return result
 	}
 	
-	final func decode(forKey key: String) throws(DecodingError) -> Int {
-		return try decode(atKeyPath: key)
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int {
+		let value = try lookupValue(for: keyPath)
+		guard case .int(let result) = value else {
+			throw DecodingError.typeMismatch(expected: "Int", found: "\(value)")
+		}
+		return result
 	}
 	
-	final func decode(forKey key: String) throws(DecodingError) -> Double {
-		return try decode(atKeyPath: key)
-	}
+	// MARK: - Integer and Unsigned Decoding
 	
-	final func decode(forKey key: String) throws(DecodingError) -> Int8 {
-		return try decode(atKeyPath: key)
-	}
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int8  { Int8(try decode(atKeyPath: keyPath)) }
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int16 { Int16(try decode(atKeyPath: keyPath)) }
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int32 { Int32(try decode(atKeyPath: keyPath)) }
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> Int64 { Int64(try decode(atKeyPath: keyPath)) }
 	
-	final func decode(forKey key: String) throws(DecodingError) -> Int16 {
-		return try decode(atKeyPath: key)
-	}
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt8  { UInt8(try decode(atKeyPath: keyPath)) }
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt16 { UInt16(try decode(atKeyPath: keyPath)) }
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt32 { UInt32(try decode(atKeyPath: keyPath)) }
+	final func decode(atKeyPath keyPath: String) throws(DecodingError) -> UInt64 { UInt64(try decode(atKeyPath: keyPath)) }
 	
-	final func decode(forKey key: String) throws(DecodingError) -> Int32 {
-		return try decode(atKeyPath: key)
-	}
+	// MARK: - Shortcut for single keys
 	
-	final func decode(forKey key: String) throws(DecodingError) -> Int64 {
-		return try decode(atKeyPath: key)
-	}
-	
-	final func decode(forKey key: String) throws(DecodingError) -> UInt8 {
-		return try decode(atKeyPath: key)
-	}
-	
-	final func decode(forKey key: String) throws(DecodingError) -> UInt16 {
-		return try decode(atKeyPath: key)
-	}
-	
-	final func decode(forKey key: String) throws(DecodingError) -> UInt32 {
-		return try decode(atKeyPath: key)
-	}
-	
-	final func decode(forKey key: String) throws(DecodingError) -> UInt64 {
-		return try decode(atKeyPath: key)
-	}
-	
-	final func decode(forKey key: String) throws(DecodingError) -> Bool {
-		return try decode(atKeyPath: key)
-	}
-	
+	final func decode(forKey key: String) throws(DecodingError) -> String  { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Bool    { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Double  { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Int     { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Int8    { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Int16   { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Int32   { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> Int64   { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> UInt8   { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> UInt16  { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> UInt32  { try decode(atKeyPath: key) }
+	final func decode(forKey key: String) throws(DecodingError) -> UInt64  { try decode(atKeyPath: key) }
 }
 
 #endif

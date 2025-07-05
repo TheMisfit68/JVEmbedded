@@ -159,10 +159,6 @@ public extension Decodable where Self: RawRepresentable, RawValue == Double {
 
 
 
-
-
-
-//
 // 3️⃣ Fallback for RawRepresentable enums (including Int, UInt, etc.)
 public extension Encodable where Self: RawRepresentable {
 
@@ -170,16 +166,6 @@ public extension Encodable where Self: RawRepresentable {
 		try encoder.encode(rawValue, forKey: "rawValue")
 	}
 }
-//
-//public extension Decodable where Self: RawRepresentable, RawValue: LosslessStringConvertible {
-//
-//	init(from decoder: Decoder) throws(DecodingError) {
-//		let raw:RawValue = try decoder.decode(forKey: "rawValue")
-//		guard let enumValue = Self(rawValue: raw) else {
-//			throw DecodingError.invalidEnumValue("Invalid value: \(raw)")
-//		}
-//		self = enumValue
-//	}
-//}
+
 
 #endif

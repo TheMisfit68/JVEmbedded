@@ -6,6 +6,7 @@
 //
 
 public enum HTTPError: Error, ESPErrorProtocol {
+	
 	case failedToInit
 	case noData
 	case okNotModified
@@ -14,5 +15,10 @@ public enum HTTPError: Error, ESPErrorProtocol {
 	case serverError
 	case redirected
 	case lostConnection
-	case unknown(Int32)
+	case requestFailed
+	case unknown
+	
+	public init(code: esp_err_t) {
+		self = .unknown
+	}
 }

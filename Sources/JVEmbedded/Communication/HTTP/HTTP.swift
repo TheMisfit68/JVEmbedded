@@ -1,92 +1,95 @@
-// HTTP.swift
 //
-// A blend of human creativity by TheMisfit68 and
-// AI assistance from ChatGPT.
-// Crafting the future, one line of Swift at a time.
-// Copyright © 2023 Jan Verrept. All rights reserved.
+//  HTTP.swift
+//
+//  A blend of human creativity by TheMisfit68 and
+//  AI assistance from ChatGPT.
+//  Crafting the future, one line of Swift at a time.
+//  Copyright © 2023 Jan Verrept. All rights reserved.
+//
 
 public class HTTPClient {
-	private var clientConfig: esp_http_client_config_t!
-
 	let baseURL: String
-	let username: String?
-	let password: String?
-	public weak var delegate: HTTPClientDelegate?
-		
+	private var clientConfig: esp_http_client_config_t!
+	var clientHandle: OpaquePointer?
+	public var delegate: HTTPClientDelegate?
+	
 	// C-callback that will be used to pass events onto the Swift message handler
-	private static let cGetCallback: @convention(c) (UnsafePointer<CChar>?, Int) -> Void = { data, len in
-		guard let data else { return }
-		let buffer = UnsafeBufferPointer(start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self), count: len)
-		let string = String(decoding: buffer, as: UTF8.self)
-	}
-	
-	public init(baseURL: String, username: String? = nil, password: String? = nil) {
-		self.baseURL = baseURL
-		self.username = username
-		self.password = password
-		HTTPClient.sharedInstance = self
-	}
-	
-	public func get(path: String) throws(HTTPError) {
-		let fullURL = baseURL + path
-		var httpContext = HTTP_ctx(date: nil, size: 0, status: 0, data: nil)
-		fullURL.withCString { urlCStr in
-			if let username = username, let password = password {
-				username.withCString { userCStr in
-					password.withCString { passCStr in
-						_ = http_get_shim(&httpContext, urlCStr, userCStr, passCStr, nil)
-					}
-				}
-			} else {
-				_ = http_get_shim(&httpContext, urlCStr, nil, nil, nil)
-			}
+	private static let cCallback: @convention(c) (UnsafeMutablePointer<esp_http_client_event_t>?) -> esp_err_t = { eventPtr in
+		guard let eventPtr = eventPtr else { return ESP_FAIL }
+		let event = eventPtr.pointee
+		
+		// Recast user_data back into Swift instance
+		if let context = event.user_data {
+			let client = Unmanaged<HTTPClient>.fromOpaque(context).takeUnretainedValue()
+			client.handleEvent(event)
+			return ESP_OK
+		} else {
+			return ESP_FAIL
 		}
 	}
 	
-	// The actual Swift event handler that will be called by the C-callback and
-	// passes the event to the delegate
-	func handleEvent(_ event: esp_mqtt_event_t) {
+	public init(baseURL: String, userName: String? = nil, password: String? = nil) {
+		self.baseURL = baseURL
 		
-		delegate?.httpClient(sharedInstance, didReceiveData: string)
+		let cURL = strdup(baseURL)
+		let cUserName = strdup(userName)
+		let cPassword = strdup(password)
+
+		defer {
+			free(cURL)
+			free(cUserName)
+			free(cPassword)
+		}
 		
+		var config = make_http_config(cURL, cUserName, cPassword, HTTPClient.cCallback)
+		let unmanagedSelf = Unmanaged.passUnretained(self).toOpaque()
+		config.user_data = unmanagedSelf
 		
-//		switch event.event_id {
-//			case MQTT_EVENT_CONNECTED:
-//				
-//				self.isConnected = true
-//				self.delegate?.mqttClientDidConnect(self)
-//				
-//				// Flush pending subscriptions
-//				for (topic, qos) in pendingSubscriptions {
-//					try? subscribe(topic: topic, qos: qos)
-//				}
-//				pendingSubscriptions.removeAll()
-//				
-//			case MQTT_EVENT_DISCONNECTED:
-//				
-//				self.isConnected = false
-//				self.delegate?.mqttClient(self, didDisconnectWithError: .operationFailed)
-//				
-//			case MQTT_EVENT_DATA:
-//				
-//				if let topicCString = event.topic, let messagePtr = event.data {
-//					let topic = String(cString: topicCString)
-//					
-//					// Convert Int8* to UInt8* for proper UTF-8 decoding
-//					let uint8Ptr = UnsafeRawPointer(messagePtr).assumingMemoryBound(to: UInt8.self)
-//					let buffer = UnsafeBufferPointer(start: uint8Ptr, count: Int(event.data_len))
-//					let messageString = String(decoding: buffer, as: UTF8.self)
-//					
-//					delegate?.mqttClient(self, didReceiveMessage: messageString, onTopic: topic)
-//				}
-//				
-//			default:
-//				break
-//		}
+		self.clientConfig = config
+		self.clientHandle = esp_http_client_init(&self.clientConfig)
 	}
+
 	
+	// Swift-side handler that maps C event to delegate call
+	func handleEvent(_ event: esp_http_client_event_t) {
+		switch event.event_id {
+			case HTTP_EVENT_ON_DATA:
+				if let data = event.data, event.data_len > 0 {
+					let buffer = UnsafeBufferPointer(start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self), count: Int(event.data_len))
+					let message = String(decoding: buffer, as: UTF8.self)
+					delegate?.httpClient(self, didReceiveData: message)
+				}
+				
+			case HTTP_EVENT_ON_CONNECTED:
+				delegate?.httpClientDidConnect(self)
+				
+			case HTTP_EVENT_HEADER_SENT:
+				delegate?.httpClientDidSendHeader(self)
+				
+			case HTTP_EVENT_ON_HEADER:
+				if let key = event.header_key, let value = event.header_value {
+					let keyStr = String(cString: key)
+					let valueStr = String(cString: value)
+					delegate?.httpClient(self, didReceiveHeader: keyStr, value: valueStr)
+				}
+				
+			case HTTP_EVENT_ON_FINISH:
+				delegate?.httpClientDidFinish(self)
+				
+			case HTTP_EVENT_DISCONNECTED:
+				delegate?.httpClientDidDisconnect(self)
+				
+			default:
+				break
+		}
+	}
 }
 
 public protocol HTTPClientDelegate: AnyObject {
+	func httpClientDidConnect(_ client: HTTPClient)
+	func httpClientDidSendHeader(_ client: HTTPClient)
+	func httpClient(_ client: HTTPClient, didReceiveHeader key: String, value: String)
 	func httpClient(_ client: HTTPClient, didReceiveData data: String)
+	func httpClientDidFinish(_ client: HTTPClient)
+	func httpClientDidDisconnect(_ client: HTTPClient)
 }

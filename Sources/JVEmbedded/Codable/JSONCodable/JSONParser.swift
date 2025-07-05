@@ -39,10 +39,12 @@ public struct JSONParser {
 		if !isAtEnd() {
 			throw DecodingError.invalidFormat("Unexpected trailing characters")
 		}
+		print("🟢 Finished parsing JSON")
 		return value
 	}
 	
 	mutating func parseValue() throws(DecodingError) -> CodableValue {
+		print("🟢 Parsing value")
 		skipWhitespace()
 		guard !isAtEnd() else {
 			throw DecodingError.invalidFormat("Unexpected end of input")
@@ -50,7 +52,7 @@ public struct JSONParser {
 		let c = peek()
 		switch c {
 			case "{":
-				return try parseObject()
+				return try parseDictionary()
 			case "[":
 				return try parseArray()
 			case "\"":
@@ -67,22 +69,29 @@ public struct JSONParser {
 		}
 	}
 	
-	mutating func parseObject() throws(DecodingError) -> CodableValue {
+	mutating func parseDictionary() throws(DecodingError) -> CodableValue {
+		print("🟢 Parsing dictionary")
 		try consume("{")
 		skipWhitespace()
-		var object = [String: CodableValue]()
+		var dict = CodableDict()
 		if peek() == "}" {
 			try consume("}")
-			return .object(object)
+			return .dictionary(dict)
 		}
 		while true {
 			skipWhitespace()
 			let key = try parseString()
+			print("🔑 Parsed dictionary key: \(key)")
+			
 			skipWhitespace()
 			try consume(":")
 			skipWhitespace()
+			
 			let value = try parseValue()
-			object[key] = value
+			print("🚨 Assigning value to dictionary: key=\(key)")
+			dict.setValue(value, forKey: key)
+			print("✅ Assigned key '\(key)' in dictionary")
+			
 			skipWhitespace()
 			if peek() == "}" {
 				try consume("}")
@@ -90,10 +99,12 @@ public struct JSONParser {
 			}
 			try consume(",")
 		}
-		return .object(object)
+		
+		return .dictionary(dict)
 	}
 	
 	mutating func parseArray() throws(DecodingError) -> CodableValue {
+		print("🟢 Parsing array")
 		try consume("[")
 		skipWhitespace()
 		var array = [CodableValue]()
@@ -116,6 +127,7 @@ public struct JSONParser {
 	}
 	
 	mutating func parseString() throws(DecodingError) -> String {
+		print("🟢 Parsing string")
 		try consume("\"")
 		var result = ""
 		while true {
@@ -181,6 +193,7 @@ public struct JSONParser {
 	}
 	
 	mutating func parseBool() throws(DecodingError) -> Bool {
+		print("🟢 Parsing boolean")
 		if try consumeIf("true") {
 			return true
 		} else if try consumeIf("false") {
@@ -190,12 +203,14 @@ public struct JSONParser {
 	}
 	
 	mutating func parseNull() throws(DecodingError) {
+		print("🟢 Parsing null")
 		if !(try consumeIf("null")) {
 			throw DecodingError.invalidFormat("Invalid null value")
 		}
 	}
 	
 	mutating func parseNumber() throws(DecodingError) -> Double {
+		print("🟢 Parsing number")
 		var numberString = ""
 		if peek() == "-" {
 			numberString.append(advance())
@@ -218,9 +233,14 @@ public struct JSONParser {
 				numberString.append(advance())
 			}
 		}
-		guard let number = Double(numberString) else {
+		
+		print("🐞🐞 Number string \(numberString)")
+		guard let number = Double(embeddedString: numberString) else {
+			print("❌ Failed to convert number string to Double")
 			throw DecodingError.invalidFormat("Invalid number format: \(numberString)")
 		}
+		let test = number.description
+		print("🐞🐞 Converted number \(test)")
 		return number
 	}
 	

@@ -1,11 +1,12 @@
 // httpclient_shim.cpp
 
-#include "httpclient_shim.h"
+#include "http_shim.h"
 
 extern "C" esp_http_client_config_t make_http_config(const char *url,
 													 const char *user,
 													 const char *pass,
-													 esp_http_client_event_handle_cb callback) {
+													 esp_err_t (*callback)(esp_http_client_event_t *evt))
+{
 	
 	esp_http_client_config_t config = {};
 	config.url = url;

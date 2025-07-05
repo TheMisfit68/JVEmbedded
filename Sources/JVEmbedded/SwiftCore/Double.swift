@@ -68,6 +68,7 @@ extension Swift.Double:LosslessStringConvertible{
 extension Swift.Double{
 	
 	public init?(embeddedString stringValue: String) {
+		
 		var value = 0.0
 		var isNegative = false
 		var seenDecimal = false

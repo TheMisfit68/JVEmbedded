@@ -256,7 +256,7 @@ extension JVEmbedded.Color.RGB {
 	
 	/// Randomly adjusts RGB values within specified per-channel ranges and clamps the result.
 	public static func random(in ranges: rgbRanges =
-						  (red: -255...255, green: -255...255, blue: -255...255) ) -> JVEmbedded.Color.RGB {
+							  (red: -255...255, green: -255...255, blue: -255...255) ) -> JVEmbedded.Color.RGB {
 		
 		// Apply random deltas
 		let red = Float.random(in: ranges.red)
@@ -271,7 +271,7 @@ extension JVEmbedded.Color.RGB {
 extension JVEmbedded.Color.HSB {
 	
 	public static func random(in ranges: hsbRanges =
-							(hue: -360...360, saturation: -100...100, brightness: -100...100) ) -> JVEmbedded.Color.HSB {
+							  (hue: -360...360, saturation: -100...100, brightness: -100...100) ) -> JVEmbedded.Color.HSB {
 		
 		// Apply random deltas
 		let hue = Float.random(in: ranges.hue)
@@ -284,7 +284,7 @@ extension JVEmbedded.Color.HSB {
 	
 	/// Randomly adjusts HSB values within specified per-channel ranges and clamps the result.
 	public func offset(by ranges:hsbRanges =
-	(hue: -360...360, saturation: -100...100, brightness: -100...100) ) -> JVEmbedded.Color.HSB {
+					   (hue: -360...360, saturation: -100...100, brightness: -100...100) ) -> JVEmbedded.Color.HSB {
 		
 		// Apply random deltas
 		var hue = self.hue+Float.random(in: ranges.hue)
@@ -302,6 +302,17 @@ extension JVEmbedded.Color.HSB {
 		}
 		
 		return JVEmbedded.Color.HSB(hue: hue, saturation: saturation, brightness: brightness)
+	}
+	
+	// Calculates an intermediate color between two HSB colors based on a fraction (0.0 to 1.0)
+	public func interpolate(to target: Self, fraction: Double) -> Self {
+		let clampedFraction = fraction.clamped(to: 0.0...1.0)
+		
+		let hue = linearInterpolate(from: Double(self.hue), to: Double(target.hue), fraction: clampedFraction)
+		let saturation = linearInterpolate(from: Double(self.saturation), to: Double(target.saturation), fraction: clampedFraction)
+		let brightness = linearInterpolate(from: Double(self.brightness), to: Double(target.brightness), fraction: clampedFraction)
+		
+		return JVEmbedded.Color.HSB(hue: Float(hue), saturation: Float(saturation), brightness: Float(brightness))
 	}
 	
 }

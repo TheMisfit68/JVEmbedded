@@ -55,15 +55,7 @@ extension Swift.Double:LosslessStringConvertible{
 
 #endif
 
-//
-//  Double.swift
-//  JVEmbedded
-//
-//  Created by Jan Verrept on 21/06/2025.
-//
-
 #if hasFeature(Embedded)
-
 
 extension Swift.Double{
 	
@@ -104,6 +96,11 @@ extension Swift.Double{
 		self = isNegative ? -value : value
 	}
 	
+}
+
+// Calculates an intermediate value between two doubles based on a fraction (0.0 to 1.0)
+public func linearInterpolate(from start: Double, to end: Double, fraction: Double) -> Double {
+	return start + (end - start) * fraction
 }
 
 #endif

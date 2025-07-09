@@ -2,7 +2,7 @@ class Timer {
 	public typealias TimerCallback = (Timer) -> Void  // Base class callback
 	
 	private var timerHandle: esp_timer_handle_t?
-	private let name: String
+	public let name: String
 	private let delay: TimeInterval
 	public var callback: TimerCallback
 	
@@ -205,9 +205,9 @@ class Oscillator: Timer {
 	
 	var enable: Bool = false {
 		didSet {
-			if enable {
+			if enable && !oldValue {
 				start()
-			} else {
+			} else if !enable {
 				stop()
 				output = false
 			}
@@ -222,13 +222,20 @@ class Oscillator: Timer {
 		
 		// Adjust the actual callback after the super's initialization
 		self.callback = { [self] _ in
+			
 			self.output = true
 			callback(self)
 			self.output = false
+			
+			// If the oscillator is still enabled, restart it for continuous oscillation
+			if self.enable {
+				self.restart()
+			}
 		}
 	}
 	
 	func updateEnable(value: Bool) {
+
 		enable = value
 	}
 

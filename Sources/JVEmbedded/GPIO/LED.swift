@@ -6,7 +6,34 @@
 //
 
 public class LED{
-	var on:Bool = false
+	
+	public var on:Bool = false{
+		didSet {
+			output.logicalValue = on
+		}
+	}
+	public var blink: Bool = false{
+		didSet {
+			if blink && !blinkTimer.isRunning {
+				self.blinkTimer.start()
+			} else if !blink {
+				self.blinkTimer.stop()
+			}
+		}
+	}
+	public var blinkSpeed: TimeInterval = 1.0
+	private var blinkTimer: Oscillator!
+	
+	public var output:DigitalOutput
+
+	
+	init(pinNumber: Int){
+		self.output = DigitalOutput(pinNumber, logic:.straight)
+		self.blinkTimer = Oscillator(name: "LED.blinkTimer", delay: blinkSpeed) { [self] blinkTimer in
+				on = !on
+		}
+	}
+	
 }
 
 extension LED{
@@ -16,8 +43,10 @@ extension LED{
 		public var pixelNumber:Int = 1
 		public var enabled: Bool = false {
 			didSet {
-				if !enabled {
-					self.color = JVEmbedded.Color.HSB.off
+				if enabled {
+					self.rgbOutput = JVEmbedded.Color.RGB(using: color)
+				}else {
+					self.rgbOutput = JVEmbedded.Color.RGB.off
 				}
 			}
 		}
@@ -33,6 +62,23 @@ extension LED{
 				if rgbOutput != oldValue {
 					self.syncHardware()
 				}
+			}
+		}
+		public var blink: Bool = false{
+			didSet {
+				if blink && !blinkTimer.isRunning {
+					self.blinkTimer.start()
+				} else if !blink {
+					self.blinkTimer.stop()
+				}
+			}
+		}
+		public var blinkSpeed: TimeInterval = 1.0
+		private var blinkTimer: Oscillator!
+		
+		init(){
+			self.blinkTimer = Oscillator(name: "LED.RGB.blinkTimer", delay: blinkSpeed) { [self] blinkTimer in
+				enabled = !enabled
 			}
 		}
 		

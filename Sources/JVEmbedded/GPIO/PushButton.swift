@@ -15,44 +15,50 @@ protocol PushButtonDelegate: AnyObject {
 open class PushButton: GPIOedgeDelegate {
 	
 	public var digitalInput: DigitalInput
-	private var clickIncrementInterval: TimeInterval = 0.5
-	private var clickIncrementTimer: Oscillator!
+	
+	private var timeOutInterval: TimeInterval = 0.50
+	private var timeOutTimer: OffDelayTimer!
+	
 	private var longPressDuration: TimeInterval = 1.0
 	private var longPressTimer: OnDelayTimer!
 	
-	open var currentClickCount: Int = 0
+	open var currentClickCount: Int = 0{
+		didSet {
+			if currentClickCount > 0 {
+				parseCurrentClickCount()
+			}
+		}
+	}
+	let maxClickCount: Int
 	var delegate: PushButtonDelegate?
 	
-	init(pinNumber: Int, logic: DigitalLogic = .straight) {
+	init(pinNumber: Int, logic: DigitalLogic = .straight, maxClickCount:Int = 2) {
 		
 		self.currentClickCount = 0
 		self.digitalInput = DigitalInput(pinNumber, logic: logic, interruptType: .anyEdge)
-
-		self.clickIncrementTimer = Oscillator(name: "PushButton.clickIncrementTimer", delay: clickIncrementInterval) { [self] clickIncrementTimer in
-			if clickIncrementTimer.output {
-				self.currentClickCount += 1
-			}
-			self.parseCurrentClickCount()
-		}
-		
+		self.maxClickCount = maxClickCount
 		
 		self.longPressTimer = OnDelayTimer(name: "PushButton.longPressTimer", delay: longPressDuration) { [self] longPressTimer in
 			self.delegate?.onLongPress()
 			longPressTimer.updateInput(value: false)
 		}
 		
+		self.timeOutTimer = OffDelayTimer(name: "PushButton.timeOutTimer", delay: timeOutInterval) {offDelayTimer in
+			self.currentClickCount = 0
+		}
+		
 		self.digitalInput.delegate = self
 	}
 	
-	func onPositiveEdge() {
-		clickIncrementTimer.updateEnable(value: true)
+	func onPositiveEdge(onInput input:DigitalInput){
 		longPressTimer.updateInput(value: true)
+		timeOutTimer.updateInput(value: true)
 		currentClickCount += 1
 	}
 	
-	func onNegativeEdge() {
-		clickIncrementTimer.updateEnable(value: false)
+	func onNegativeEdge(onInput input:DigitalInput) {
 		longPressTimer.updateInput(value: false)
+		timeOutTimer.updateInput(value: false)
 	}
 	
 	func parseCurrentClickCount() {
@@ -61,14 +67,18 @@ open class PushButton: GPIOedgeDelegate {
 			case 1:
 				delegate?.onClick()
 			case 2:
-				delegate?.onMultipleClicks(count: 2)
 				delegate?.onDoubleClick()
+				delegate?.onMultipleClicks(count: 2)
+			case 3...:
+				delegate?.onMultipleClicks(count: currentClickCount)
 			default:
-				if currentClickCount > 2 {
-					delegate?.onMultipleClicks(count: currentClickCount)
-				}
+				break // No action for zero or negative counts
 		}
-		currentClickCount = 0
+		
+		if currentClickCount >= maxClickCount {
+			currentClickCount = 0 // Reset after reaching max count
+		}
+		
 	}
 	
 }

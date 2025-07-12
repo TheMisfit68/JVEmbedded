@@ -1,38 +1,44 @@
+// Buzzer.swift
+//
+// A blend of human creativity by TheMisfit68  and
+// AI assistance from ChatGPT.
+// Crafting the future, one line of Swift at a time.
+// Copyright © 2023 Jan Verrept. All rights reserved.
+
 struct Buzzer {}
 
 extension Buzzer {
+	
 	// MARK: - Passive buzzer using software tone generation
 	public final class Passive {
-		private let pinNumber: Int
 		
-		public init(pinNumber: Int) {
-			self.pinNumber = pinNumber
-			// Configure GPIO/PWM setup if needed
+		private let output: PWMOutput
+		
+		public init(pinNumber: Int, channel: Int = 0) {
+			self.output = PWMOutput(pinNumber, channelNumber: channel, percentage: 0)
 		}
 		
 		public func play(frequencyHz: Int, durationMs: Int) {
-			// Direct tone generation at frequency
-			// Placeholder for square wave logic or PWM driver
-			print("🔊 Passive buzzer: playing \(frequencyHz)Hz for \(durationMs)ms on pin-number \(pinNumber)")
-			// TODO: Use Timer or hardware call
+			output.frequency = UInt32(frequencyHz)
+			output.setPercentage(to: 50) // 50% duty cycle for square wave
+			JVEmbedded.Time.sleep(ms: durationMs)
+			stop()
 		}
 		
 		public func stop() {
-			// Stop tone
-			print("🔇 Passive buzzer: stop")
-			// TODO: stop PWM or square wave
+			output.setPercentage(to: 0)
 		}
 		
 		public func play(tone tag: ToneGenerator.ToneTag) {
-			guard let tone = ToneGenerator.tones[tag] else {
+			guard let tone = ToneGenerator.tones.value(forKey: tag) else {
 				print("❌ Tone '\(tag)' not found")
 				return
 			}
-			self.play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
+			play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
 		}
 		
 		public func play(pattern tag: ToneGenerator.PatternTag) {
-			guard let pattern = ToneGenerator.patterns[tag] else {
+			guard let pattern = ToneGenerator.patterns.value(forKey: tag) else {
 				print("❌ Pattern '\(tag)' not found")
 				return
 			}
@@ -40,18 +46,18 @@ extension Buzzer {
 			for _ in 0..<pattern.repeatCount {
 				for tone in pattern.tones {
 					if tone.frequencyHz > 0 {
-						self.play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
+						play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
 					}
 					JVEmbedded.Time.sleep(ms: pattern.interToneDelayMs)
 				}
 				JVEmbedded.Time.sleep(ms: pattern.interCycleDelayMs)
 			}
 		}
-		
 	}
 	
 	// MARK: - Active buzzer (on/off only)
 	public final class Active {
+		
 		private let output: DigitalOutput
 		
 		public init(pin: Int) {
@@ -73,6 +79,7 @@ extension Buzzer {
 		}
 	}
 }
+
 
 public struct ToneGenerator {
 	
@@ -104,34 +111,35 @@ public struct ToneGenerator {
 		public let interCycleDelayMs: Int
 	}
 	
-	public static let tones: [ToneTag: Tone] = [
-		.shortBeep: Tone(frequencyHz: 3000, durationMs: 100),
-		.longBeep: Tone(frequencyHz: 1000, durationMs: 500),
-		.doubleBeep: Tone(frequencyHz: 2000, durationMs: 200),
-		.alarmTone1: Tone(frequencyHz: 3000, durationMs: 150),
-		.alarmTone2: Tone(frequencyHz: 3000, durationMs: 150),
-		.ackBeep: Tone(frequencyHz: 1000, durationMs: 100),
-		.silence: Tone(frequencyHz: 0, durationMs: 100)
-	]
+	public static let tones = JVEmbedded.Dictionary<ToneTag, Tone>([
+		JVEmbedded.KeyValuePair(key: .shortBeep,   value: Tone(frequencyHz: 3000, durationMs: 100)),
+		JVEmbedded.KeyValuePair(key: .longBeep,    value: Tone(frequencyHz: 1000, durationMs: 500)),
+		JVEmbedded.KeyValuePair(key: .doubleBeep,  value: Tone(frequencyHz: 2000, durationMs: 200)),
+		JVEmbedded.KeyValuePair(key: .alarmTone1,  value: Tone(frequencyHz: 3000, durationMs: 150)),
+		JVEmbedded.KeyValuePair(key: .alarmTone2,  value: Tone(frequencyHz: 3000, durationMs: 150)),
+		JVEmbedded.KeyValuePair(key: .ackBeep,     value: Tone(frequencyHz: 1000, durationMs: 100)),
+		JVEmbedded.KeyValuePair(key: .silence,     value: Tone(frequencyHz: 0,    durationMs: 100))
+	])
 	
-	public static let patterns: [PatternTag: Pattern] = [
-		.MAXMAXalarm: Pattern(
+	public static let patterns = JVEmbedded.Dictionary<PatternTag, Pattern>([
+		JVEmbedded.KeyValuePair(key: .MAXMAXalarm, value: Pattern(
 			tones: [
-				tones[.alarmTone1]!,
-				tones[.silence]!,
-				tones[.alarmTone2]!
+				tones.value(forKey: .alarmTone1)!,
+				tones.value(forKey: .silence)!,
+				tones.value(forKey: .alarmTone2)!
 			],
 			repeatCount: 4,
 			interToneDelayMs: 80,
 			interCycleDelayMs: 200
-		),
-		.MAXalarm: Pattern(
+		)),
+		
+		JVEmbedded.KeyValuePair(key: .MAXalarm, value: Pattern(
 			tones: [
-				tones[.ackBeep]!
+				tones.value(forKey: .ackBeep)!
 			],
 			repeatCount: 1,
 			interToneDelayMs: 100,
 			interCycleDelayMs: 100
-		)
-	]
+		))
+	])
 }

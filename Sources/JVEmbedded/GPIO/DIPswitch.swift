@@ -1,11 +1,11 @@
 //
-//  DIPswitch.swift
+//  DIPSwitch.swift
 //  JVEmbedded
 //
 //  Created by Jan Verrept on 22/04/2025.
 //
 
-public class DIPswitch{
+public class DIPSwitch{
 	
 	let digitalInputs: [DigitalInput]
 	

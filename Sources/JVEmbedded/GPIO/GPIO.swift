@@ -41,8 +41,8 @@ enum DigitalLogic: Int {
 }
 
 protocol GPIOedgeDelegate: AnyObject {
-	func onPositiveEdge()
-	func onNegativeEdge()
+	func onPositiveEdge(onInput input:DigitalInput)
+	func onNegativeEdge(onInput input:DigitalInput)
 }
 
 // Subclass for Digital Input
@@ -121,9 +121,9 @@ public final class DigitalInput: GPIO {
 		debounceTimer = Timer(name: "DebounceTimer", delay: debounceDuration) { [self] _ in
 			let currentLogicalValue = logicalValue
 			if !previousLogicalValue && currentLogicalValue {
-				delegate?.onPositiveEdge()
+				delegate?.onPositiveEdge(onInput:self)
 			} else if previousLogicalValue && !currentLogicalValue {
-				delegate?.onNegativeEdge()
+				delegate?.onNegativeEdge(onInput:self)
 			}
 			previousLogicalValue = currentLogicalValue
 		}
@@ -176,87 +176,138 @@ public struct PWMConfiguration {
 }
 
 public final class PWMOutput: GPIO {
-	private static let frequency: UInt32 = 5000
-	private static let maxScale: UInt32 = 8192
 	
-	static public func installFadingService() {
-		// Install the fade service
+	private static let defaultFrequency: UInt32 = 5000
+	
+	private let timer: ledc_timer_t
+	private let pwmChannel: ledc_channel_t
+	private var dutyResolution: ledc_timer_bit_t = LEDC_TIMER_13_BIT
+	
+	/// Public property for frequency in Hz. Changing this reconfigures the timer.
+	public var frequency: UInt32 = defaultFrequency {
+		didSet {
+			reconfigureTimerAndSyncDuty()
+		}
+	}
+	
+	/// Percentage of the cycle that is HIGH (0–100%). Internally recalculates duty cycle.
+	private var percentage: Int = 50 {
+		didSet {
+			percentage = max(0, min(100, percentage))
+			updateDuty()
+		}
+	}
+	
+	/// Computed raw duty cycle based on resolution and percentage.
+	private var dutyCycle: UInt32 {
+		let scale = 1 << dutyResolution.rawValue
+		return UInt32((Double(percentage) / 100.0) * Double(scale))
+	}
+	
+	/// Set PWM output to a specific percentage (0–100).
+	public func setPercentage(to newPercentage: Int) {
+		self.percentage = newPercentage
+	}
+	
+	/// Smoothly fades PWM to a new percentage over time.
+	public func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
+		let clamped = max(0, min(100, targetPercentage))
+		percentage = clamped // update state immediately for consistency
+		
+		let fadeDuty = UInt32((Double(clamped) / 100.0) * Double(1 << dutyResolution.rawValue))
+		
+		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, fadeDuty, Int32(durationMs)) == ESP_OK,
+			  ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
+			fatalError("Failed to fade duty cycle")
+		}
+	}
+	
+	/// Call this once in app setup to enable LEDC fade functionality.
+	public static func installFadingService() {
 		guard ledc_fade_func_install(0) == ESP_OK else {
 			fatalError("Failed to install LEDC fade service")
 		}
 	}
 	
-	private let pwmChannel: ledc_channel_t
-	private var percentage: Int = 50 {
-		didSet {
-			percentage = min(100, max(0, percentage))
-		}
-	}
-	
-	private var dutyCycle: UInt32 {
-		UInt32((Double(percentage) / 100.0) * Double(Self.maxScale))
-	}
-	
-	init(_ pinNumber: Int, channelNumber: Int, percentage: Int = 50) {
+	/// Designated initializer. Allows selecting pin, channel, and timer.
+	public init(_ pinNumber: Int, timerNumber: Int = 0, channelNumber: Int = 0, percentage: Int = 50) {
 		self.percentage = percentage
+		
+		switch timerNumber {
+			case 0: self.timer = LEDC_TIMER_0
+			case 1: self.timer = LEDC_TIMER_1
+			case 2: self.timer = LEDC_TIMER_2
+			case 3: self.timer = LEDC_TIMER_3
+			default: fatalError("Invalid timer number")
+		}
+		
 		switch channelNumber {
-			case 0: pwmChannel = LEDC_CHANNEL_0
-			case 1: pwmChannel = LEDC_CHANNEL_1
-			case 2: pwmChannel = LEDC_CHANNEL_2
-			case 3: pwmChannel = LEDC_CHANNEL_3
-			case 4: pwmChannel = LEDC_CHANNEL_4
-			case 5: pwmChannel = LEDC_CHANNEL_5
+			case 0: self.pwmChannel = LEDC_CHANNEL_0
+			case 1: self.pwmChannel = LEDC_CHANNEL_1
+			case 2: self.pwmChannel = LEDC_CHANNEL_2
+			case 3: self.pwmChannel = LEDC_CHANNEL_3
+			case 4: self.pwmChannel = LEDC_CHANNEL_4
+			case 5: self.pwmChannel = LEDC_CHANNEL_5
 			default: fatalError("Invalid channel number")
 		}
+		
 		super.init(pinNumber)
 		configureGPIO()
 	}
 	
 	override func configureGPIO() {
 		resetPin()
-		var timerConfig = ledc_timer_config_t(
-			speed_mode: LEDC_LOW_SPEED_MODE,
-			duty_resolution: LEDC_TIMER_13_BIT,
-			timer_num: LEDC_TIMER_0,
-			freq_hz: Self.frequency,
-			clk_cfg: LEDC_AUTO_CLK,
-			deconfigure: false
-		)
-		guard ledc_timer_config(&timerConfig) == ESP_OK else {
-			fatalError("LEDC timer configuration failed")
-		}
+		reconfigureTimerAndSyncDuty()
 		
 		var channelConfig = ledc_channel_config_t(
 			gpio_num: Int32(pinNumber),
 			speed_mode: LEDC_LOW_SPEED_MODE,
 			channel: pwmChannel,
 			intr_type: LEDC_INTR_DISABLE,
-			timer_sel: LEDC_TIMER_0,
+			timer_sel: timer,
 			duty: dutyCycle,
 			hpoint: 0,
-//			sleep_mode: LEDC_SLEEP_MODE_NO_ALIVE_NO_PD,
 			flags: .init(output_invert: 0)
 		)
+		
 		guard ledc_channel_config(&channelConfig) == ESP_OK else {
 			fatalError("LEDC channel configuration failed")
 		}
 	}
 	
-	func setPercentage(to newPercentage: Int) {
-		percentage = newPercentage
+	private func reconfigureTimerAndSyncDuty() {
+		let srcClkHz: UInt32 = 80_000_000 // APB_CLK
+		let rawResolution = ledc_find_suitable_duty_resolution(srcClkHz, frequency)
+		
+		guard rawResolution < UInt32(LEDC_TIMER_BIT_MAX.rawValue) else {
+			fatalError("No suitable duty resolution found for frequency \(frequency)Hz")
+		}
+		
+		let resolution = ledc_timer_bit_t(rawValue: rawResolution)
+		self.dutyResolution = resolution
+		
+		var timerConfig = ledc_timer_config_t(
+			speed_mode: LEDC_LOW_SPEED_MODE,
+			duty_resolution: resolution,
+			timer_num: timer,
+			freq_hz: frequency,
+			clk_cfg: LEDC_AUTO_CLK,
+			deconfigure: false
+		)
+		
+		guard ledc_timer_config(&timerConfig) == ESP_OK else {
+			fatalError("LEDC timer configuration failed")
+		}
+		
+		updateDuty()
+	}
+	
+	private func updateDuty() {
 		guard ledc_set_duty(LEDC_LOW_SPEED_MODE, pwmChannel, dutyCycle) == ESP_OK else {
 			fatalError("Failed to set duty")
 		}
 		guard ledc_update_duty(LEDC_LOW_SPEED_MODE, pwmChannel) == ESP_OK else {
 			fatalError("Failed to update duty")
-		}
-	}
-	
-	func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
-		percentage = targetPercentage
-		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, dutyCycle, Int32(durationMs)) == ESP_OK,
-			  ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
-			fatalError("Failed to fade duty cycle")
 		}
 	}
 }

@@ -138,11 +138,11 @@ extension JVEmbedded{
 			static let black = JVEmbedded.Color.HSB(hue: 0.0, saturation: 0.0, brightness: 0.0)
 			static let white = JVEmbedded.Color.HSB(hue: 0.0, saturation: 0.0, brightness: 100.0)
 			static let red = JVEmbedded.Color.HSB(hue: 0.0, saturation: 100.0, brightness: 100.0)
-			static let orange = JVEmbedded.Color.HSB(hue: 20.0, saturation: 100.0, brightness: 100.0)
+			static let orange = JVEmbedded.Color.HSB(hue: 30.0, saturation: 100.0, brightness: 100.0)
 			static let yellow = JVEmbedded.Color.HSB(hue: 60.0, saturation: 100.0, brightness: 100.0)
-			static let green = JVEmbedded.Color.HSB(hue: 120.0, saturation: 100.0, brightness: 100.0)
-			static let blue = JVEmbedded.Color.HSB(hue: 240.0, saturation: 100.0, brightness: 100.0)
-			static let indigo = JVEmbedded.Color.HSB(hue: 275.0, saturation: 100.0, brightness: 100.0)
+			static let green = JVEmbedded.Color.HSB(hue: 90.0, saturation: 100.0, brightness: 100.0)
+			static let blue = JVEmbedded.Color.HSB(hue: 200.0, saturation: 100.0, brightness: 100.0)
+			static let indigo = JVEmbedded.Color.HSB(hue: 250.0, saturation: 100.0, brightness: 100.0)
 			static let violet = JVEmbedded.Color.HSB(hue: 300.0, saturation: 100.0, brightness: 100.0)
 			
 			// MARK: - Range and values

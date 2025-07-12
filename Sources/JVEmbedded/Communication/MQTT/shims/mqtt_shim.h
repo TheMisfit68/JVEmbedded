@@ -7,7 +7,6 @@
 #undef MBEDTLS_CONFIG_FILE
 #endif
 
-//#include <mqtt_client.h>
 #include <mqtt5_client.h>
 #include <mbedtls/esp_config.h>
 

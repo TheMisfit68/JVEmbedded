@@ -1,8 +1,8 @@
 //
-//  RGB_LED.swift
+//  LED.swift
 //  JVEmbedded
 //
-//  Created by Jan Verrept on 02/03/2025.
+//  Created by Jan Verrept on 15/07/2025.
 //
 
 public class LED{
@@ -25,12 +25,12 @@ public class LED{
 	private var blinkTimer: Oscillator!
 	
 	public var output:DigitalOutput
-
+	
 	
 	init(pinNumber: Int){
 		self.output = DigitalOutput(pinNumber, logic:.straight)
 		self.blinkTimer = Oscillator(name: "LED.blinkTimer", delay: blinkSpeed) { [self] blinkTimer in
-				on = !on
+			on = !on
 		}
 	}
 	
@@ -40,7 +40,6 @@ extension LED{
 	
 	public class RGB{
 		
-		public var pixelNumber:Int = 1
 		public var enabled: Bool = false {
 			didSet {
 				if enabled {
@@ -146,6 +145,7 @@ extension LED{
 		private var handle: led_driver_handle_t
 		
 		init(pinNumber: Int? = nil, channelNumber: Int? = nil){
+			
 			var config = led_driver_get_config()
 			if let pinNumber = pinNumber {
 				config.gpio = Int32(pinNumber)
@@ -174,122 +174,124 @@ extension LED{
 	}
 	
 	// MARK: - Addressable strip
-	public final class Strip {
+	public final class Strip: LED.RGB {
 		
-		public typealias matrix = LED.Strip
+		public typealias Matrix = LED.Strip
 		
-		//		/// Convenience accessor for function pointers
-		//		private var cFunctionPointers: led_strip_t { handle.pointee }
-		//		typealias ledStripHandle = UnsafeMutablePointer<led_strip_t>
-		//		private var handle: ledStripHandle
-		//
-		//		public var enabled: Bool = false{
-		//			didSet{
-		//				syncHardware()
-		//			}
-		//		}
-		//
-		//		public var colors: [JVEmbedded.Color.HSB] = [] {
-		//			didSet {
-		//				syncHardware()
-		//			}
-		//		}
-		//
+		private(set) var handle: UnsafeMutablePointer<led_strip_t>?
+		public let pixelCount: Int
 		
-		//		init(pinNumber: UInt32, pixelCount: Int = 2) {
-		//
-		//			var testChannel = rmt_config_t(
-		//				rmt_mode : RMT_MODE_TX,
-		//				channel : channel_id,
-		//				gpio_num : pinNumber,
-		//				clk_div : 80,
-		//				mem_block_num : 1,
-		//				flags = 0,
-		//				tx_config = {
-		//					.carrier_freq_hz = 38000,
-		//					.carrier_level = RMT_CARRIER_LEVEL_HIGH,
-		//					.idle_level = RMT_IDLE_LEVEL_LOW,
-		//					.carrier_duty_percent = 33,
-		//					.carrier_en = false,
-		//					.loop_en = false,
-		//					.idle_output_en = true,
-		//				)
-		//
-		//
-		//
-		//			var channelConfig = rmt_config_t(
-		//				channel: 0,
-		//				gpio_num: pinNumber
-		//			)
-		//
-		//			var ledStripConfig = led_strip_config_t(
-		//				max_leds: pixelCount,
-		//				dev: (led_strip_dev_t)channelConfig.channel // Assign correct RMT channel,
-		//			)
-		//
-		//			// Apply RMT configuration
-		//			guard rmt_config(&rmtConfig) == ESP_OK else {
-		//				fatalError("⚠️ [LED.Strip.init] Failed to configure RMT")
-		//			}
-		//			guard rmt_driver_install(rmtConfig.channel, 0, 0) == ESP_OK else {
-		//				fatalError("⚠️ [LED.Strip.init] Failed to install RMT driver")
-		//			}
-		//
-		//			// Create the LED strip instance
-		//			guard let stripHandle = led_strip_new_rmt_ws2812(&stripConfig) else {
-		//				fatalError("⚠️ [LED.Strip.init] Failed to initialize LED strip")
-		//			}
-		//
-		//			self.handle = stripHandle
-		//			self.colors = Array(repeating: JVEmbedded.Color.HSB.off, count: pixelCount)
-		//
-		//			// Clear LED strip on init
-		//			if let clearFunction = cFunctionPointers.clear {
-		//				clearFunction(handle, 100)
-		//			}
-		//		}
-		//
-		//
-		//
-		//
-		//
-		//		deinit {
-		//			if let delFunction = cFunctionPointers.del {
-		//				let result = delFunction(handle)
-		//				if result != ESP_OK {
-		//					print("⚠️ [LED.Strip.deinit] Failed to delete LED strip resources")
-		//				}
-		//			}
-		//		}
-		//
-		//		/// Sets the color of a specific pixel in the LED strip
-		//		public func setColorForPixel(atIndex index: Int, color: JVEmbedded.Color.HSB) {
-		//			guard index >= 0, index < colors.count else {
-		//				print("⚠️ [LED.Strip.setColorForPixel] Pixel index \(index) out of bounds")
-		//				return
-		//			}
-		//
-		//			colors[index] = color
-		//
-		//			if let setPixelFunction = cFunctionPointers.set_pixel {
-		//				let result = setPixelFunction(handle, UInt32(index), UInt32(color.hue), UInt32(color.saturation), UInt32(color.brightness))
-		//				if result != ESP_OK {
-		//					print("⚠️ [LED.Strip.setColorForPixel] Failed to set pixel color at index \(index), error: \(result)")
-		//				}
-		//			}
-		//		}
-		//
-		//		func syncHardware() {
-		//			if self.enabled && !colors.isEmpty {
-		//				for (index, color) in colors.enumerated() {
-		//					setColorForPixel(atIndex: index, color: color)
-		//				}
-		//			} else {
-		//				if let clearFunction = cFunctionPointers.clear {
-		//					clearFunction(handle, UInt32(1000))
-		//				}
-		//			}
-		//		}
+		public var colors: [JVEmbedded.Color.HSB] {
+			didSet {
+				if enabled {
+					self.rgbOutputs = colors.map { JVEmbedded.Color.RGB(using: $0) }
+				}
+			}
+		}
+		
+		var rgbOutputs: [JVEmbedded.Color.RGB] {
+			didSet {
+				if rgbOutputs != oldValue {
+					try? self.syncHardware()
+				}
+			}
+		}
+		
+		public override var enabled: Bool {
+			didSet {
+				if !enabled {
+					try? clear()
+				} else {
+					self.rgbOutputs = self.colors.map { JVEmbedded.Color.RGB(using: $0) }
+				}
+			}
+		}
+		
+		// MARK: - Init
+		
+		public init(pinNumber: Int32, channelNumber: UInt32 = 0, pixelCount: Int = 2) throws(ESPError) {
+			
+			self.pixelCount = pixelCount
+			
+			self.colors = Array(repeating: JVEmbedded.Color.HSB.off, count: pixelCount)
+			super.init()
+			
+			var rmtConfig = rmt_config_t()
+			rmtConfig.rmt_mode = RMT_MODE_TX
+			rmtConfig.channel = rmt_channel_t(channelNumber)
+			rmtConfig.gpio_num = gpio_num_t(pinNumber)
+			rmtConfig.clk_div = 2
+			rmtConfig.mem_block_num = 1
+			rmtConfig.flags = 0
+			
+			rmtConfig.tx_config.carrier_freq_hz = 38000
+			rmtConfig.tx_config.carrier_level = RMT_CARRIER_LEVEL_HIGH
+			rmtConfig.tx_config.idle_level = RMT_IDLE_LEVEL_LOW
+			rmtConfig.tx_config.carrier_duty_percent = 33
+			rmtConfig.tx_config.carrier_en = false
+			rmtConfig.tx_config.loop_en = false
+			rmtConfig.tx_config.idle_output_en = true
+			
+			try ESPError.check(rmt_config(&rmtConfig))
+			try ESPError.check(rmt_driver_install(rmtConfig.channel, 0, 0))
+			
+			var stripConfig = led_strip_config_t()
+			stripConfig.max_leds = UInt32(pixelCount)
+			stripConfig.dev = UnsafeMutableRawPointer(bitPattern: UInt(rmtConfig.channel.rawValue))
+			
+			guard let handle = led_strip_new_rmt_ws2812(&stripConfig) else {
+				throw ESPError.fail
+			}
+			self.handle = handle
+		}
+		
+		deinit {
+			if let handle = handle {
+				_ = handle.pointee.del(handle)
+			}
+		}
+		
+		// MARK: - Hardware interaction
+		
+		public override func syncHardware() {
+#if DEBUG
+			print("💡Syncing LED strip with \(rgbOutputs.count) RGB pixels")
+#endif
+			try? setPixels(rgbColors: rgbOutputs)
+		}
+		
+		func setPixels(rgbColors: [JVEmbedded.Color.RGB]) throws {
+			guard let handle = handle else { throw ESPError.fail }
+			
+			for index in 0..<rgbColors.count {
+				let rgb = rgbColors[index]
+				try setPixel(index: UInt32(index), red: UInt32(rgb.red), green: UInt32(rgb.green), blue: UInt32(rgb.blue))
+			}
+			
+			for index in rgbColors.count..<pixelCount {
+				try setPixel(index: UInt32(index), red: 0, green: 0, blue: 0)
+			}
+			
+			try refresh()
+		}
+		
+		private func setPixel(index: UInt32, red: UInt32, green: UInt32, blue: UInt32) throws {
+			guard let handle = handle else { throw ESPError.fail }
+			let result = handle.pointee.set_pixel(handle, index, red, green, blue)
+			try ESPError.check(result)
+		}
+		
+		private func refresh(timeoutMs: UInt32 = 100) throws {
+			guard let handle = handle else { throw ESPError.fail }
+			let result = handle.pointee.refresh(handle, timeoutMs)
+			try ESPError.check(result)
+		}
+		
+		private func clear(timeoutMs: UInt32 = 100) throws {
+			guard let handle = handle else { throw ESPError.fail }
+			let result = handle.pointee.clear(handle, timeoutMs)
+			try ESPError.check(result)
+		}
 	}
 }
 

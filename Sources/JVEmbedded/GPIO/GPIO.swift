@@ -146,7 +146,7 @@ public final class DigitalOutput: GPIO {
 		resetPin()
 		guard gpio_set_direction(gpioPinNumber, GPIO_MODE_OUTPUT) == ESP_OK,
 			  gpio_pullup_dis(gpioPinNumber) == ESP_OK,
-			  gpio_pulldown_dis(gpioPinNumber) == ESP_OK else {
+			  gpio_pulldown_en(gpioPinNumber) == ESP_OK else { // Enable pull-down to prevent floating output
 			fatalError("Digital output configuration failed")
 		}
 	}
@@ -191,7 +191,7 @@ public final class PWMOutput: GPIO {
 	}
 	
 	/// Percentage of the cycle that is HIGH (0–100%). Internally recalculates duty cycle.
-	private var percentage: Int = 50 {
+	private var percentage: Int = 0 {
 		didSet {
 			percentage = max(0, min(100, percentage))
 			updateDuty()

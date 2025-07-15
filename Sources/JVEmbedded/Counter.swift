@@ -58,6 +58,10 @@ public class Counter {
 			pcnt_channel_set_edge_action(channelHandle, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE)
 			pcnt_channel_set_level_action(channelHandle, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE)
 			self.channelHandle = channelHandle
+			
+			// Start counting
+			pcnt_unit_enable(handle)
+			pcnt_unit_start(handle)
 		}
 	}
 	

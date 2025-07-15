@@ -16,6 +16,7 @@ extension Buzzer {
 		
 		public init(pinNumber: Int, channel: Int = 0) {
 			self.output = PWMOutput(pinNumber, channelNumber: channel, percentage: 0)
+			self.stop() // Ensure it's off initially
 		}
 		
 		public func play(frequencyHz: Int, durationMs: Int) {
@@ -62,6 +63,7 @@ extension Buzzer {
 		
 		public init(pin: Int) {
 			self.output = DigitalOutput(pin)
+			self.stop() // Ensure it's off initially
 		}
 		
 		public func start() {

@@ -19,7 +19,7 @@ public final class RotaryEncoder {
 				delegate?.valueChanged(on: self, newValue: value)
 #if DEBUG
 				let stringValue:String = String(value)
-				print("🐞🐞RotaryEncoder value changed: \(stringValue)")
+				print("🎛️ RotaryEncoder value changed: \(stringValue)")
 #endif
 			}
 		}
@@ -44,8 +44,8 @@ public final class RotaryEncoder {
 		self.fastCounter = try Counter(pulsePinNumber: clockPinNumber, controlPinNumber: dataPinNumber, unit: unit)
 		if let switchPin = switchPinNumber {
 			let button = DigitalInput(switchPin, interruptType: .negativeEdge)
-			button.delegate = self
 			self.resetButton = button
+			self.resetButton?.delegate = self
 		}
 	}
 	
@@ -67,6 +67,8 @@ extension RotaryEncoder:GPIOedgeDelegate{
 	public func onPositiveEdge(onInput input: DigitalInput) {}
 	
 	public func onNegativeEdge(onInput input: DigitalInput) {
+		print("😄😄 RotaryEncoder reset button pressed")
+
 		if input === resetButton {
 			reset()
 		}

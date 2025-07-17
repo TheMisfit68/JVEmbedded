@@ -111,6 +111,22 @@ function(add_module RELATIVE_PATH)
             add_file(${REL_PATH})
         endforeach()
         
+        # === Add bridging header for the module itself if found in include/ ===
+        get_filename_component(MODULE_NAME ${MODULE_PATH} NAME)
+        string(TOLOWER ${MODULE_NAME} MODULE_NAME_LOWER)
+        set(INCLUDE_HEADER_PATH "${MODULE_PATH}/include/${MODULE_NAME_LOWER}.h")
+
+        if(EXISTS "${INCLUDE_HEADER_PATH}")
+            # Add the include directory for compiler search paths
+            target_include_directories(${COMPONENT_LIB} PRIVATE "${MODULE_PATH}/include")
+
+            # Write to the bridging header fragment
+            set(BRIDGING_HEADER_FRAGMENT "${CMAKE_CURRENT_LIST_DIR}/JVEmbeddedAutoBridgingHeader.h")
+            file(APPEND "${BRIDGING_HEADER_FRAGMENT}" "#include \"${MODULE_NAME_LOWER}.h\"\n")
+
+            message(STATUS "[JVEmbedded] Bridging header added: include/${MODULE_NAME_LOWER}.h")
+        endif()
+        
     else()
         message(WARNING "Module path ${MODULE_PATH} does not exist or is not a directory.")
     endif()

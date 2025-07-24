@@ -9,25 +9,60 @@ struct Buzzer {}
 
 extension Buzzer {
 	
+	public enum BridgeMode {
+		case phaseEnable
+		case inIn
+	}
+	
 	// MARK: - Passive buzzer using software tone generation
 	public final class Passive {
 		
-		private let output: PWMOutput
+		private let bridgeMode: Buzzer.BridgeMode
+		private let pwmOutput1: PWMOutput
+		private let pwmOutput2: PWMOutput
+		private let toneGen = ToneGenerator()
 		
-		public init(pinNumber: Int, channel: Int = 0) {
-			self.output = PWMOutput(pinNumber, channelNumber: channel, percentage: 0)
-			self.stop() // Ensure it's off initially
+		// MARK: - Public initializer
+		public init(pin1: Int, pin2: Int, bridgeMode: BridgeMode) {
+			self.bridgeMode = bridgeMode
+			// Initialize the PWM outputs with a duty cycle of 50% for a buzzer
+			self.pwmOutput1 = PWMOutput(pin1, channelNumber: 0, percentage: 50)
+			
+			switch bridgeMode {
+				case .phaseEnable:
+					// If the bridge type is passivePhaseEnable, we use the second output as a constant enable signal
+					self.pwmOutput2 = PWMOutput(pin2, channelNumber: 1, percentage: 100)
+				case .inIn:
+					// If the bridge type is inIn, we need a second output for the opposite phase
+					self.pwmOutput2 = PWMOutput(pin2, channelNumber: 1, percentage: 50, logic: .inverse)
+			}
+			self.stop()
 		}
 		
 		public func play(frequencyHz: Int, durationMs: Int) {
-			output.frequency = UInt32(frequencyHz)
-			output.setPercentage(to: 50) // 50% duty cycle for square wave
+			switch bridgeMode {
+				case .phaseEnable:
+					
+					// set the frequency for the correct tone hight
+					pwmOutput1.frequency = UInt32(frequencyHz)
+					pwmOutput2.setPercentage(to: 100) // Enable the second output at full duty cycle
+					
+				case .inIn:
+					
+					// Both outputs are used to create the same square wave (but in opposite phases)
+					pwmOutput1.frequency = UInt32(frequencyHz)
+					pwmOutput2.frequency = UInt32(frequencyHz)
+					pwmOutput1.setPercentage(to: 50)
+					
+			}
+			
 			JVEmbedded.Time.sleep(ms: durationMs)
 			stop()
 		}
 		
 		public func stop() {
-			output.setPercentage(to: 0)
+			pwmOutput1.setPercentage(to: 0)
+			pwmOutput2.setPercentage(to: 0)
 		}
 		
 		public func play(tone tag: ToneGenerator.ToneTag) {
@@ -81,8 +116,6 @@ extension Buzzer {
 		}
 	}
 }
-
-
 public struct ToneGenerator {
 	
 	public enum ToneTag: String {

@@ -35,7 +35,7 @@ public class GPIO {
 }
 
 // Enum for Digital Logic
-enum DigitalLogic: Int {
+public enum DigitalLogic: Int {
 	case straight
 	case inverse
 }
@@ -178,7 +178,7 @@ public struct PWMConfiguration {
 public final class PWMOutput: GPIO {
 	
 	private static let defaultFrequency: UInt32 = 5000
-	
+	private let logic: DigitalLogic
 	private let timer: ledc_timer_t
 	private let pwmChannel: ledc_channel_t
 	private var dutyResolution: ledc_timer_bit_t = LEDC_TIMER_13_BIT
@@ -193,7 +193,6 @@ public final class PWMOutput: GPIO {
 	/// Percentage of the cycle that is HIGH (0–100%). Internally recalculates duty cycle.
 	private var percentage: Int = 0 {
 		didSet {
-			percentage = max(0, min(100, percentage))
 			updateDuty()
 		}
 	}
@@ -206,15 +205,13 @@ public final class PWMOutput: GPIO {
 	
 	/// Set PWM output to a specific percentage (0–100).
 	public func setPercentage(to newPercentage: Int) {
-		self.percentage = newPercentage
+		self.percentage = newPercentage.clamped(to: 0...100)
 	}
 	
 	/// Smoothly fades PWM to a new percentage over time.
 	public func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
-		let clamped = max(0, min(100, targetPercentage))
-		percentage = clamped // update state immediately for consistency
-		
-		let fadeDuty = UInt32((Double(clamped) / 100.0) * Double(1 << dutyResolution.rawValue))
+		setPercentage(to: targetPercentage)
+		let fadeDuty = dutyCycle
 		
 		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, fadeDuty, Int32(durationMs)) == ESP_OK,
 			  ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
@@ -229,9 +226,9 @@ public final class PWMOutput: GPIO {
 		}
 	}
 	
-	/// Designated initializer. Allows selecting pin, channel, and timer.
-	public init(_ pinNumber: Int, timerNumber: Int = 0, channelNumber: Int = 0, percentage: Int = 50) {
+	public init(_ pinNumber: Int, timerNumber: Int = 0, channelNumber: Int = 0, percentage: Int = 50, logic: DigitalLogic = .straight) {
 		self.percentage = percentage
+		self.logic = logic
 		
 		switch timerNumber {
 			case 0: self.timer = LEDC_TIMER_0
@@ -267,7 +264,7 @@ public final class PWMOutput: GPIO {
 			timer_sel: timer,
 			duty: dutyCycle,
 			hpoint: 0,
-			flags: .init(output_invert: 0)
+			flags: .init(output_invert: (logic == .inverse) ? 1 : 0)
 		)
 		
 		guard ledc_channel_config(&channelConfig) == ESP_OK else {

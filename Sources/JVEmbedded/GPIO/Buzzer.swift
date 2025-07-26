@@ -24,6 +24,7 @@ extension Buzzer {
 		
 		// MARK: - Public initializer
 		public init(pin1: Int, pin2: Int, bridgeMode: BridgeMode) {
+			
 			self.bridgeMode = bridgeMode
 			// Initialize the PWM outputs with a duty cycle of 50% for a buzzer
 			self.pwmOutput1 = PWMOutput(pin1, channelNumber: 0, percentage: 50)
@@ -37,50 +38,17 @@ extension Buzzer {
 					self.pwmOutput2 = PWMOutput(pin2, channelNumber: 1, percentage: 50, logic: .inverse)
 			}
 			self.stop()
-		}
-		
-		public func play(frequencyHz: Int, durationMs: Int) {
-			switch bridgeMode {
-				case .phaseEnable:
-					
-					// set the frequency for the correct tone hight
-					pwmOutput1.frequency = UInt32(frequencyHz)
-					pwmOutput2.setPercentage(to: 100) // Enable the second output at full duty cycle
-					
-				case .inIn:
-					
-					// Both outputs are used to create the same square wave (but in opposite phases)
-					pwmOutput1.frequency = UInt32(frequencyHz)
-					pwmOutput2.frequency = UInt32(frequencyHz)
-					pwmOutput1.setPercentage(to: 50)
-					
-			}
 			
-			JVEmbedded.Time.sleep(ms: durationMs)
-			stop()
 		}
 		
-		public func stop() {
-			pwmOutput1.setPercentage(to: 0)
-			pwmOutput2.setPercentage(to: 0)
-		}
-		
-		public func play(tone tag: ToneGenerator.ToneTag) {
-			guard let tone = ToneGenerator.tones.value(forKey: tag) else {
-				print("❌ Tone '\(tag)' not found")
-				return
-			}
-			play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
-		}
-		
-		public func play(pattern tag: ToneGenerator.PatternTag) {
-			guard let pattern = ToneGenerator.patterns.value(forKey: tag) else {
-				print("❌ Pattern '\(tag)' not found")
-				return
-			}
+		public func play(pattern:ToneGenerator.Pattern) {
 			
 			for _ in 0..<pattern.repeatCount {
-				for tone in pattern.tones {
+				for toneTag in pattern.tones {
+					guard let tone = ToneGenerator.tones.value(forKey: toneTag) else {
+						print("❌ Tone '\(toneTag)' not found")
+						continue
+					}
 					if tone.frequencyHz > 0 {
 						play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
 					}
@@ -88,7 +56,44 @@ extension Buzzer {
 				}
 				JVEmbedded.Time.sleep(ms: pattern.interCycleDelayMs)
 			}
+			
 		}
+		
+		public func play(tone tag: ToneGenerator.ToneTag) {
+			
+			guard let tone = ToneGenerator.tones.value(forKey: tag) else {
+				print("❌ Tone '\(tag)' not found")
+				return
+			}
+			play(frequencyHz: tone.frequencyHz, durationMs: tone.durationMs)
+		}
+		
+		public func stop() {
+			pwmOutput1.stop()
+			pwmOutput2.stop()
+		}
+		
+		// MARK: - Private helper methods
+		
+		private func play(frequencyHz: Int, durationMs: Int) {
+			
+			// set the frequency for the correct tone hight
+			switch bridgeMode {
+				case .phaseEnable:
+					
+					pwmOutput1.frequency = UInt32(frequencyHz)
+					
+				case .inIn:
+					
+					// Both outputs are used to create the same square wave (but in opposite phases)
+					pwmOutput1.frequency = UInt32(frequencyHz)
+					pwmOutput2.frequency = UInt32(frequencyHz)
+			}
+			
+			JVEmbedded.Time.sleep(ms: durationMs)
+			stop()
+		}
+		
 	}
 	
 	// MARK: - Active buzzer (on/off only)
@@ -116,65 +121,58 @@ extension Buzzer {
 		}
 	}
 }
+
+
+// ToneGenerator.swift
+// used with a passive buzzer for generating various tones and patterns
 public struct ToneGenerator {
 	
 	public enum ToneTag: String {
-		case shortBeep
-		case longBeep
-		case doubleBeep
-		case alarmTone1
-		case alarmTone2
-		case ackBeep
+		case lowBeep
+		case midBeep
+		case highBeep
+		case shortClick
 		case silence
 	}
 	
-	public enum PatternTag: String {
-		case MAXMAXalarm
-		case MAXalarm
-		case idle
-	}
-	
+	// MARK: - Tone Struct
 	public struct Tone {
+		
 		public let frequencyHz: Int
 		public let durationMs: Int
+		
+		public init(frequencyHz: Int, durationMs: Int) {
+			self.frequencyHz = frequencyHz
+			self.durationMs = durationMs
+		}
+		
 	}
 	
+	public static let tones = JVEmbedded.Dictionary<ToneTag, Tone>([
+		JVEmbedded.KeyValuePair(key: .lowBeep,   value: Tone(frequencyHz: 250, durationMs: 200)),
+		JVEmbedded.KeyValuePair(key: .midBeep,    value: Tone(frequencyHz: 700, durationMs: 200)),
+		JVEmbedded.KeyValuePair(key: .highBeep,  value: Tone(frequencyHz: 2000, durationMs: 200)),
+		JVEmbedded.KeyValuePair(key: .shortClick,  value: Tone(frequencyHz: 1000, durationMs: 80)),
+		JVEmbedded.KeyValuePair(key: .silence, value: Tone(frequencyHz: 0, durationMs: 100))
+	])
+	
+	// MARK: - Pattern Definition
 	public struct Pattern {
-		public let tones: [Tone]
+		public let tones: [ToneTag]
 		public let repeatCount: Int
 		public let interToneDelayMs: Int
 		public let interCycleDelayMs: Int
 	}
 	
-	public static let tones = JVEmbedded.Dictionary<ToneTag, Tone>([
-		JVEmbedded.KeyValuePair(key: .shortBeep,   value: Tone(frequencyHz: 3000, durationMs: 100)),
-		JVEmbedded.KeyValuePair(key: .longBeep,    value: Tone(frequencyHz: 1000, durationMs: 500)),
-		JVEmbedded.KeyValuePair(key: .doubleBeep,  value: Tone(frequencyHz: 2000, durationMs: 200)),
-		JVEmbedded.KeyValuePair(key: .alarmTone1,  value: Tone(frequencyHz: 3000, durationMs: 150)),
-		JVEmbedded.KeyValuePair(key: .alarmTone2,  value: Tone(frequencyHz: 3000, durationMs: 150)),
-		JVEmbedded.KeyValuePair(key: .ackBeep,     value: Tone(frequencyHz: 1000, durationMs: 100)),
-		JVEmbedded.KeyValuePair(key: .silence,     value: Tone(frequencyHz: 0,    durationMs: 100))
-	])
-	
-	public static let patterns = JVEmbedded.Dictionary<PatternTag, Pattern>([
-		JVEmbedded.KeyValuePair(key: .MAXMAXalarm, value: Pattern(
-			tones: [
-				tones.value(forKey: .alarmTone1)!,
-				tones.value(forKey: .silence)!,
-				tones.value(forKey: .alarmTone2)!
-			],
-			repeatCount: 4,
-			interToneDelayMs: 80,
-			interCycleDelayMs: 200
-		)),
-		
-		JVEmbedded.KeyValuePair(key: .MAXalarm, value: Pattern(
-			tones: [
-				tones.value(forKey: .ackBeep)!
-			],
-			repeatCount: 1,
-			interToneDelayMs: 100,
-			interCycleDelayMs: 100
-		))
-	])
+	public static let toneScale = ToneGenerator.Pattern(
+		tones: [
+			.lowBeep,
+			.midBeep,
+			.highBeep
+		],
+		repeatCount: 2,
+		interToneDelayMs: 80,
+		interCycleDelayMs: 100
+	)
+
 }

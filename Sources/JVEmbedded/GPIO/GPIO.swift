@@ -177,6 +177,13 @@ public struct PWMConfiguration {
 
 public final class PWMOutput: GPIO {
 	
+	/// Call this once in app setup to enable LEDC fade functionality.
+	public static func installFadingService() {
+		guard ledc_fade_func_install(0) == ESP_OK else {
+			fatalError("Failed to install LEDC fade service")
+		}
+	}
+	
 	private static let defaultFrequency: UInt32 = 5000
 	private let logic: DigitalLogic
 	private let timer: ledc_timer_t
@@ -186,7 +193,11 @@ public final class PWMOutput: GPIO {
 	/// Public property for frequency in Hz. Changing this reconfigures the timer.
 	public var frequency: UInt32 = defaultFrequency {
 		didSet {
-			reconfigureTimerAndSyncDuty()
+			if frequency == 0 && oldValue != 0 {
+				stop() // Only stop if we transitioned into "off" state
+			} else if frequency > 0 {
+				configureGPIO()
+			}
 		}
 	}
 	
@@ -201,29 +212,6 @@ public final class PWMOutput: GPIO {
 	private var dutyCycle: UInt32 {
 		let scale = 1 << dutyResolution.rawValue
 		return UInt32((Double(percentage) / 100.0) * Double(scale))
-	}
-	
-	/// Set PWM output to a specific percentage (0–100).
-	public func setPercentage(to newPercentage: Int) {
-		self.percentage = newPercentage.clamped(to: 0...100)
-	}
-	
-	/// Smoothly fades PWM to a new percentage over time.
-	public func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
-		setPercentage(to: targetPercentage)
-		let fadeDuty = dutyCycle
-		
-		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, fadeDuty, Int32(durationMs)) == ESP_OK,
-			  ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
-			fatalError("Failed to fade duty cycle")
-		}
-	}
-	
-	/// Call this once in app setup to enable LEDC fade functionality.
-	public static func installFadingService() {
-		guard ledc_fade_func_install(0) == ESP_OK else {
-			fatalError("Failed to install LEDC fade service")
-		}
 	}
 	
 	public init(_ pinNumber: Int, timerNumber: Int = 0, channelNumber: Int = 0, percentage: Int = 50, logic: DigitalLogic = .straight) {
@@ -272,6 +260,34 @@ public final class PWMOutput: GPIO {
 		}
 	}
 	
+	/// Set PWM output to a specific percentage (0–100).
+	public func setPercentage(to newPercentage: Int) {
+		self.percentage = newPercentage.clamped(to: 0...100)
+	}
+	
+	/// Smoothly fades PWM to a new percentage over time.
+	public func fadeToPercentage(_ targetPercentage: Int, durationMs: Int) {
+		setPercentage(to: targetPercentage)
+		let fadeDuty = dutyCycle
+		
+		guard ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, pwmChannel, fadeDuty, Int32(durationMs)) == ESP_OK,
+			  ledc_fade_start(LEDC_LOW_SPEED_MODE, pwmChannel, LEDC_FADE_NO_WAIT) == ESP_OK else {
+			fatalError("Failed to fade duty cycle")
+		}
+	}
+	
+	// Make sure the PWM is completely stopped.
+	public func stop() {
+		ledc_stop(LEDC_LOW_SPEED_MODE, pwmChannel, 0)  // LOW level
+		
+		// Optional: manually ensure pin is output and low
+		gpio_reset_pin(gpioPinNumber)
+		gpio_set_direction(gpioPinNumber, GPIO_MODE_OUTPUT)
+		gpio_set_level(gpioPinNumber, 0)
+	}
+	
+	
+	// Mark: - Private Methods
 	private func reconfigureTimerAndSyncDuty() {
 		let srcClkHz: UInt32 = 80_000_000 // APB_CLK
 		let rawResolution = ledc_find_suitable_duty_resolution(srcClkHz, frequency)

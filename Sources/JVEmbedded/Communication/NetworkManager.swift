@@ -117,7 +117,7 @@ final class NetworkManager:Singleton {
 	let WIFI_AUTHMODE: wifi_auth_mode_t = WIFI_AUTH_WPA2_PSK
 	let WIFI_CONNECTED_BIT: UInt32 = 1 << 0
 	let WIFI_FAIL_BIT : UInt32 = 1 << 1
-	let maxRetryAttempts = 3
+	let maxRetryAttempts = 10
 	
 	// MARK: - Internal State
 	var retryCount = 0

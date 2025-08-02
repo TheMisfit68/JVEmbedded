@@ -69,8 +69,8 @@ extension Buzzer {
 		}
 		
 		public func stop() {
-			pwmOutput1.stop()
-			pwmOutput2.stop()
+			pwmOutput1.enabled = false
+			pwmOutput2.enabled = false
 		}
 		
 		// MARK: - Private helper methods

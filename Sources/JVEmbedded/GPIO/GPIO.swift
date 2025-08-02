@@ -184,6 +184,16 @@ public final class PWMOutput: GPIO {
 		}
 	}
 	
+	// Disabling the PWMOutput will stop the PWM signal and hold the pin to a permanent low state.
+	public var enabled: Bool = true {
+		didSet {
+			if enabled {
+				configureGPIO()
+			} else if oldValue == true {
+				stop() // Ensure we stop PWM when disabled
+			}
+		}
+	}
 	private static let defaultFrequency: UInt32 = 5000
 	private let logic: DigitalLogic
 	private let timer: ledc_timer_t
@@ -194,9 +204,9 @@ public final class PWMOutput: GPIO {
 	public var frequency: UInt32 = defaultFrequency {
 		didSet {
 			if frequency == 0 && oldValue != 0 {
-				stop() // Only stop if we transitioned into "off" state
+				enabled = false // Disable PWM if frequency is set to 0
 			} else if frequency > 0 {
-				configureGPIO()
+				enabled = true // Re-enable PWM if frequency is valid
 			}
 		}
 	}
@@ -276,13 +286,15 @@ public final class PWMOutput: GPIO {
 		}
 	}
 	
-	// Make sure the PWM is completely stopped.
-	public func stop() {
+	// Stop the PWM signal and hold the pin to a permanent low state.
+	private func stop() {
+		
 		ledc_stop(LEDC_LOW_SPEED_MODE, pwmChannel, 0)  // LOW level
 		
-		// Optional: manually ensure pin is output and low
-		gpio_reset_pin(gpioPinNumber)
+		// Turn the pin into a regular output and set it to low
 		gpio_set_direction(gpioPinNumber, GPIO_MODE_OUTPUT)
+		gpio_pullup_dis(gpioPinNumber)
+		gpio_pulldown_en(gpioPinNumber)
 		gpio_set_level(gpioPinNumber, 0)
 	}
 	

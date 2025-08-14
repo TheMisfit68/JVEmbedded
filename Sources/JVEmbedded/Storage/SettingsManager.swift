@@ -6,7 +6,7 @@
 //
 
 protocol ConfigurableSettings {
-	init?()
+	init?(nameSpace: String?)
 }
 	
 // A simple settings manager

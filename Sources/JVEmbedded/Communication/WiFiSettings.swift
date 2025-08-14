@@ -12,8 +12,8 @@ struct WiFiSettings:ConfigurableSettings {
 	var SSID: String?
 	var password: String?
 	
-	init?(){
-		let namespace = "WiFi"
+	init?(nameSpace:String? = nil){
+		let namespace = nameSpace ?? "WiFi" // Provides the default namespace if none is specified
 		do {
 			SSID = try SettingsManager.shared.readNVS(namespace:namespace, key: "SSID")
 			password = try SettingsManager.shared.readNVS(namespace:namespace, key: "Password")

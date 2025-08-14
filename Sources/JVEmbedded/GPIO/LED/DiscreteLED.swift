@@ -28,7 +28,7 @@ open class LED{
 	public var output:DigitalOutput
 	
 	
-	init(pinNumber: Int){
+	init(pinNumber: GPIO.PinNumber){
 		self.output = DigitalOutput(pinNumber, logic:.straight)
 		self.blinkTimer = Oscillator(name: "LED.blinkTimer", delay: blinkSpeed) { [self] blinkTimer in
 			on = !on
@@ -95,16 +95,17 @@ extension LED{
 	// with 3 discrete channels
 	open class Analog: LED.RGB {
 		
+		
 		private var redOutput: PWMOutput
 		private var greenOutput: PWMOutput
 		private var blueOutput: PWMOutput
 		private var fadingEnabled: Bool
 		
-		init(redPWM: PWMConfiguration, greenPWM: PWMConfiguration, bluePWM: PWMConfiguration, enableFading: Bool = false) {
+		init(redPinAndChannel: (GPIO.PinNumber,GPIO.ChannelNumber), greenPinAndChannel: (GPIO.PinNumber,GPIO.ChannelNumber), bluePinAndChannel: (GPIO.PinNumber,GPIO.ChannelNumber), timerNumber:GPIO.TimerNumber, enableFading: Bool = false) {
 			
-			self.redOutput = PWMOutput(redPWM.pin, channelNumber: redPWM.channel)
-			self.greenOutput = PWMOutput(greenPWM.pin, channelNumber: greenPWM.channel)
-			self.blueOutput = PWMOutput(bluePWM.pin, channelNumber: bluePWM.channel)
+			self.redOutput = PWMOutput(redPinAndChannel.0, channelNumber: redPinAndChannel.1, timerNumber: timerNumber)
+			self.greenOutput = PWMOutput(greenPinAndChannel.0, channelNumber: greenPinAndChannel.1, timerNumber: timerNumber)
+			self.blueOutput = PWMOutput(bluePinAndChannel.0, channelNumber: bluePinAndChannel.1, timerNumber: timerNumber)
 			self.fadingEnabled = enableFading
 			super.init()
 			
@@ -133,7 +134,7 @@ extension LED{
 			if self.fadingEnabled {
 				redOutput.fadeToPercentage(redPercentage, durationMs: 1000)
 				greenOutput.fadeToPercentage(greenPercentage, durationMs: 1000)
-				blueOutput.fadeToPercentage(bluePercentage, durationMs:1000)
+				blueOutput.fadeToPercentage(bluePercentage, durationMs: 1000)
 			}else{
 				redOutput.setPercentage(to:redPercentage)
 				greenOutput.setPercentage(to:greenPercentage)
@@ -142,8 +143,6 @@ extension LED{
 			
 		}
 	}
-	
-
 	
 }
 
@@ -204,4 +203,3 @@ extension LED.RGB{
 	}
 	
 }
-

@@ -5,7 +5,7 @@
 // Crafting the future, one line of Swift at a time.
 // Copyright © 2023 Jan Verrept. All rights reserved.
 
-protocol PushButtonDelegate: AnyObject {
+public protocol PushButtonDelegate: AnyObject {
 	func onClick()
 	func onDoubleClick()
 	func onLongPress()
@@ -30,9 +30,9 @@ open class PushButton: GPIOedgeDelegate {
 		}
 	}
 	let maxClickCount: Int
-	var delegate: PushButtonDelegate?
+	public var delegate: PushButtonDelegate?
 	
-	init(pinNumber: Int, logic: DigitalLogic = .straight, maxClickCount:Int = 2) {
+	public init(pinNumber: GPIO.PinNumber, logic: GPIO.DigitalLogic = .straight, maxClickCount:Int = 2) {
 		
 		self.currentClickCount = 0
 		self.digitalInput = DigitalInput(pinNumber, logic: logic, interruptType: .anyEdge)

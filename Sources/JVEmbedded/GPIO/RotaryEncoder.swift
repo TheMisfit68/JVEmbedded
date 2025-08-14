@@ -27,21 +27,20 @@ public final class RotaryEncoder {
 	
 	private let stepValue: Double
 	private let range: ClosedRange<Double>
-	
+	private var resetButton: DigitalInput? = nil
+
 	public var delegate: RotaryEncoderDelegate? = nil
-	public var resetButton: DigitalInput? = nil
 	
 	public init(
-		clockPinNumber:Int32,
-		dataPinNumber:Int32? = nil,
-		switchPinNumber:Int? = nil,
+		clockPinNumber:GPIO.PinNumber,
+		dataPinNumber:GPIO.PinNumber,
+		switchPinNumber:GPIO.PinNumber? = nil,
 		stepValue:Double = 1.0,
 		range:ClosedRange<Double> = 0.0...100.0,
-		unit:Counter.Unit = .unit0
 	) throws(ESPError) {
 		self.stepValue = stepValue
 		self.range = range
-		self.fastCounter = try Counter(pulsePinNumber: clockPinNumber, controlPinNumber: dataPinNumber, unit: unit)
+		self.fastCounter = try Counter(pulsePinNumber: clockPinNumber, controlPinNumber: dataPinNumber)
 		if let switchPin = switchPinNumber {
 			let button = DigitalInput(switchPin, interruptType: .negativeEdge)
 			self.resetButton = button
@@ -64,14 +63,17 @@ public final class RotaryEncoder {
 
 extension RotaryEncoder:GPIOedgeDelegate{
 	
-	public func onPositiveEdge(onInput input: DigitalInput) {}
+	public func onPositiveEdge(onInput input: DigitalInput) {
+		// Not used, but required by GPIOedgeDelegate protocol
+	}
 	
 	public func onNegativeEdge(onInput input: DigitalInput) {
 		print("😄😄 RotaryEncoder reset button pressed")
-
+		
 		if input === resetButton {
 			reset()
 		}
 	}
+	
 	
 }

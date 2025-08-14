@@ -18,24 +18,25 @@ extension Buzzer {
 	public final class Passive {
 		
 		private let bridgeMode: Buzzer.BridgeMode
-		private let pwmOutput1: PWMOutput
-		private let pwmOutput2: PWMOutput
+		private let pwmOutputA: PWMOutput
+		private let pwmOutputB: PWMOutput
 		private let toneGen = ToneGenerator()
 		
 		// MARK: - Public initializer
-		public init(pin1: Int, pin2: Int, bridgeMode: BridgeMode) {
+		public init(pinAndChannelA: (GPIO.PinNumber,GPIO.ChannelNumber), pinAndChannelB: (GPIO.PinNumber,GPIO.ChannelNumber), timerNumber:GPIO.TimerNumber, bridgeMode: BridgeMode) {
 			
 			self.bridgeMode = bridgeMode
 			// Initialize the PWM outputs with a duty cycle of 50% for a buzzer
-			self.pwmOutput1 = PWMOutput(pin1, channelNumber: 0, percentage: 50)
+			self.pwmOutputA = PWMOutput(pinAndChannelA.0, channelNumber: pinAndChannelA.1, timerNumber: timerNumber, percentage: 50)
 			
 			switch bridgeMode {
 				case .phaseEnable:
 					// If the bridge type is passivePhaseEnable, we use the second output as a constant enable signal
-					self.pwmOutput2 = PWMOutput(pin2, channelNumber: 1, percentage: 100)
+					self.pwmOutputB = PWMOutput(pinAndChannelB.0, channelNumber: pinAndChannelB.1, timerNumber: timerNumber, percentage: 100)
+					
 				case .inIn:
 					// If the bridge type is inIn, we need a second output for the opposite phase
-					self.pwmOutput2 = PWMOutput(pin2, channelNumber: 1, percentage: 50, logic: .inverse)
+					self.pwmOutputB = PWMOutput(pinAndChannelB.0, channelNumber: pinAndChannelB.1, timerNumber: timerNumber, percentage: 50, logic: .inverse)
 			}
 			self.stop()
 			
@@ -69,8 +70,8 @@ extension Buzzer {
 		}
 		
 		public func stop() {
-			pwmOutput1.enabled = false
-			pwmOutput2.enabled = false
+			pwmOutputA.stop()
+			pwmOutputB.stop()
 		}
 		
 		// MARK: - Private helper methods
@@ -81,13 +82,13 @@ extension Buzzer {
 			switch bridgeMode {
 				case .phaseEnable:
 					
-					pwmOutput1.frequency = UInt32(frequencyHz)
+					pwmOutputA.frequency = UInt32(frequencyHz)
 					
 				case .inIn:
 					
 					// Both outputs are used to create the same square wave (but in opposite phases)
-					pwmOutput1.frequency = UInt32(frequencyHz)
-					pwmOutput2.frequency = UInt32(frequencyHz)
+					pwmOutputA.frequency = UInt32(frequencyHz)
+					pwmOutputB.frequency = UInt32(frequencyHz)
 			}
 			
 			JVEmbedded.Time.sleep(ms: durationMs)
@@ -101,7 +102,7 @@ extension Buzzer {
 		
 		private let output: DigitalOutput
 		
-		public init(pin: Int) {
+		public init(pin: GPIO.PinNumber) {
 			self.output = DigitalOutput(pin)
 			self.stop() // Ensure it's off initially
 		}
@@ -174,5 +175,6 @@ public struct ToneGenerator {
 		interToneDelayMs: 80,
 		interCycleDelayMs: 100
 	)
-
+	
 }
+

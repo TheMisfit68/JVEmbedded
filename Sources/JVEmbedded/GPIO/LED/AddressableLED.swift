@@ -12,17 +12,28 @@ extension LED {
 	
 	open class Addressable: LED.RGB {
 		
+		public enum ChannelNumber: Int, RawRepresentable {
+			case channel0 = 0
+			case channel1 = 1
+			case channel2 = 2
+			case channel3 = 3
+			case channel4 = 4
+			case channel5 = 5
+			case channel6 = 6
+			case channel7 = 7
+			
+			var espValue: rmt_channel_t {
+				rmt_channel_t(UInt32(rawValue))
+			}
+		}
+		
 		private var handle: led_driver_handle_t
 		
-		init(pinNumber: Int? = nil, channelNumber: Int? = nil){
+		init(pinNumber: GPIO.PinNumber, channelNumber: Addressable.ChannelNumber){
 			
 			var config = led_driver_get_config()
-			if let pinNumber = pinNumber {
-				config.gpio = Int32(pinNumber)
-			}
-			if let channelNumber = channelNumber {
-				config.channel = Int32(channelNumber)
-			}
+			config.gpio = Int32(pinNumber.rawValue)
+			config.channel = Int32(channelNumber.rawValue)
 			guard let handle = led_driver_init(&config) else {
 				fatalError("[⚠️ LED.Addressable.init] Failed to initialize LED driver handle")
 			}
@@ -81,7 +92,7 @@ extension LED {
 		}
 		
 		// MARK: - Init
-		public init(pinNumber: Int32, channelNumber: UInt32 = 0, pixelCount: Int = 2) throws(ESPError) {
+		public 	init(pinAndChannel:(GPIO.PinNumber, LED.Addressable.ChannelNumber), pixelCount:Int = 2) throws(ESPError) {
 			
 			self.pixelCount = pixelCount
 			
@@ -90,8 +101,8 @@ extension LED {
 			
 			var rmtConfig = rmt_config_t()
 			rmtConfig.rmt_mode = RMT_MODE_TX
-			rmtConfig.channel = rmt_channel_t(channelNumber)
-			rmtConfig.gpio_num = gpio_num_t(pinNumber)
+			rmtConfig.channel =  pinAndChannel.1.espValue
+			rmtConfig.gpio_num = pinAndChannel.0.espValue
 			rmtConfig.clk_div = 2
 			rmtConfig.mem_block_num = 1
 			rmtConfig.flags = 0
@@ -242,4 +253,3 @@ extension LED.Strip {
 	}
 	
 }
-

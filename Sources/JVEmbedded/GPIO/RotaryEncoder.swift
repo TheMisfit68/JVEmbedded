@@ -68,7 +68,7 @@ extension RotaryEncoder:GPIOedgeDelegate{
 	}
 	
 	public func onNegativeEdge(onInput input: DigitalInput) {
-		print("😄😄 RotaryEncoder reset button pressed")
+		print("RotaryEncoder reset button pressed")
 		
 		if input === resetButton {
 			reset()

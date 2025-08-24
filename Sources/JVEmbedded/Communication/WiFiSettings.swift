@@ -7,18 +7,17 @@
 
 
 
-struct WiFiSettings:ConfigurableSettings {
+public struct WiFiSettings:ConfigurableSettings {
 	
 	var SSID: String?
 	var password: String?
 	
-	init?(nameSpace:String? = nil){
-		let namespace = nameSpace ?? "WiFi" // Provides the default namespace if none is specified
+	init?(nameSpace:String = "WiFi"){
 		do {
-			SSID = try SettingsManager.shared.readNVS(namespace:namespace, key: "SSID")
-			password = try SettingsManager.shared.readNVS(namespace:namespace, key: "Password")
+			SSID = try SettingsManager.shared.readNVS(namespace:nameSpace, key: "SSID")
+			password = try SettingsManager.shared.readNVS(namespace:nameSpace, key: "Password")
 		} catch {
-			print("❌ Error reading \(namespace)-settings: \(error)")
+			print("❌ Error reading \(nameSpace)-settings: \(error)")
 			return nil
 		}
 	}

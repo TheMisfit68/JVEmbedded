@@ -9,6 +9,7 @@
 public enum ESPError: Error, ESPErrorProtocol {
 	
 	case ok
+	case networkError(NetworkError)
 	case fail
 	case noMem
 	case invalidArg

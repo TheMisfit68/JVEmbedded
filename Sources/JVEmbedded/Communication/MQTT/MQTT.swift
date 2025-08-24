@@ -5,6 +5,14 @@
 //  Created by Jan Verrept on 02/05/2025.
 //
 
+// MARK: - MQTT Client delegate protocol
+public protocol MQTTClientDelegate: AnyObject {
+	func mqttClientDidConnect(_ client: MQTTClient)
+	func mqttClient(_ client: MQTTClient, didDisconnectWithError error: MQTTerror?)
+	func mqttClient(_ client: MQTTClient, didReceiveMessage message: String, onTopic topic: String)
+}
+
+// MARK: - MQTT Client
 public class MQTTClient {
 	
 	private var clientConfig: esp_mqtt_client_config_t!
@@ -160,13 +168,6 @@ public class MQTTClient {
 				break
 		}
 	}
-}
-
-
-public protocol MQTTClientDelegate: AnyObject {
-	func mqttClientDidConnect(_ client: MQTTClient)
-	func mqttClient(_ client: MQTTClient, didDisconnectWithError error: MQTTerror?)
-	func mqttClient(_ client: MQTTClient, didReceiveMessage message: String, onTopic topic: String)
 }
 
 // MARK: - C-bridging

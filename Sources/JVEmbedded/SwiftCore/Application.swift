@@ -15,7 +15,7 @@ extension JVEmbedded{
 	public final class Application:Singleton {
 		
 		// MARK: - Singleton
-		public static let shared = Application()
+		public static let shared:Application = Application()
 		public static var wifiSettingsNameSpace:String = "WiFi"
 		
 		public var delegate:JVEmbedded.AppDelegate? = nil
@@ -24,47 +24,59 @@ extension JVEmbedded{
 		private var reconnectTimer:Oscillator!
 		public var recconnectInterval:Double = 10.0
 		
-		private init() {
+		private init(){
 			
 			// Setup the network
-			NetworkManager3.shared.delegate = self
-			NetworkManager3.shared.connect(settingsNameSpace: JVEmbedded.Application.wifiSettingsNameSpace)
+			NetworkManager.shared?.delegate = self
+			do{
+				try NetworkManager.shared?.connect(settingsNameSpace: JVEmbedded.Application.wifiSettingsNameSpace)
+			}catch let error{
+#if DEBUG
+				print("⚠️ Network connection failed: \(error)")
+#endif
+			}
 			self.reconnectTimer = Oscillator(name: "Application.reconnectTimer", delay: recconnectInterval) { oscillator in
-				NetworkManager3.shared.connect(settingsNameSpace: JVEmbedded.Application.wifiSettingsNameSpace)
+				// Attempt to reconnect
+				if let _ = try? NetworkManager.shared?.connect(settingsNameSpace: JVEmbedded.Application.wifiSettingsNameSpace) {
+#if DEBUG
+					print("✅ Network reconnected successfully")
+#endif
+				} else {
+#if DEBUG
+					print("⚠️ Network reconnection failed")
+#endif
+				}
 			}
 			self.reconnectTimer.enable = false
-			
 		}
 		
-		// Restart the entire ESP32 system
-		public func restart(){
-			esp_restart()
-		}
 		
 	}
 	
+	// Restart the entire ESP32 system
+	public func restart(){
+		esp_restart()
+	}
 	
 }
 
-// MARK: - NetworkManager3Delegate
-extension JVEmbedded.Application:NetworkManager3Delegate{
+
+// MARK: - NetworkManagerDelegate
+extension JVEmbedded.Application:NetworkManagerDelegate{
+	
 	public func networkDidConnect() {
 		
-#if DEBUG
-		print("✅ Network connected")
-#endif
 		delegate?.didConnect()
 		reconnectTimer.enable = false // Pause the reconnect timer
 	}
 	
 	public func networkDidDisconnect() {
-#if DEBUG
-		print("⚠️ Network disconnected, retrying...")
-#endif
+
 		delegate?.didDisconnect()
 	}
 	
 	public func networkDidFailToConnect(){
+		
 		reconnectTimer.enable = true // Start the reconnect timer to retry connecting after a while
 	}
 	
